@@ -117,45 +117,71 @@ Now analyze the screenshot and generate the DESIGN.md:`;
     generationConfig: { temperature: 0.4, maxOutputTokens: 4096 }
   });
 
-  const options = {
-    hostname: 'generativelanguage.googleapis.com',
-    path: `/v1beta/models/gemini-2.5-flash:generateContent?key=${apiKey}`,
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      'Content-Length': Buffer.byteLength(payload)
+  // Try models in order of preference, fall back on overload
+  const models = [
+    'gemini-2.0-flash',
+    'gemini-2.5-flash',
+    'gemini-1.5-flash',
+    'gemini-1.5-pro'
+  ];
+
+  const tryModel = (modelIdx) => {
+    if (modelIdx >= models.length) {
+      return res.status(503).json({ error: 'All Gemini models overloaded, please try again later' });
     }
+    const model = models[modelIdx];
+    const options = {
+      hostname: 'generativelanguage.googleapis.com',
+      path: `/v1beta/models/${model}:generateContent?key=${apiKey}`,
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Content-Length': Buffer.byteLength(payload)
+      }
+    };
+
+    const request = https.request(options, (response) => {
+      let data = '';
+      response.on('data', chunk => data += chunk);
+      response.on('end', () => {
+        try {
+          const json = JSON.parse(data);
+          if (json.error) {
+            // Overloaded / rate limited — try next model
+            const msg = json.error.message || '';
+            if (response.statusCode === 503 || response.statusCode === 429 ||
+                msg.includes('overload') || msg.includes('high demand')) {
+              console.log(`${model} overloaded, trying next...`);
+              return tryModel(modelIdx + 1);
+            }
+            console.error('Gemini error:', json.error);
+            return res.status(500).json({ error: msg || 'Gemini API error' });
+          }
+          const text = json.candidates?.[0]?.content?.parts?.[0]?.text;
+          if (!text) {
+            // Some models return empty when image rejected — try next
+            return tryModel(modelIdx + 1);
+          }
+          // Strip markdown code fences if present
+          const cleaned = text.replace(/^```markdown?\n?/i, '').replace(/\n?```\s*$/i, '').trim();
+          res.json({ content: cleaned, model });
+        } catch (e) {
+          console.error('Parse error:', e, data.substring(0, 500));
+          tryModel(modelIdx + 1);
+        }
+      });
+    });
+
+    request.on('error', (err) => {
+      console.error(`${model} request error:`, err);
+      tryModel(modelIdx + 1);
+    });
+
+    request.write(payload);
+    request.end();
   };
 
-  const request = https.request(options, (response) => {
-    let data = '';
-    response.on('data', chunk => data += chunk);
-    response.on('end', () => {
-      try {
-        const json = JSON.parse(data);
-        if (json.error) {
-          console.error('Gemini error:', json.error);
-          return res.status(500).json({ error: json.error.message || 'Gemini API error' });
-        }
-        const text = json.candidates?.[0]?.content?.parts?.[0]?.text;
-        if (!text) return res.status(500).json({ error: 'No content in response' });
-        // Strip markdown code fences if present
-        const cleaned = text.replace(/^```markdown?\n?/i, '').replace(/\n?```\s*$/i, '').trim();
-        res.json({ content: cleaned });
-      } catch (e) {
-        console.error('Parse error:', e, data.substring(0, 500));
-        res.status(500).json({ error: 'Failed to parse Gemini response' });
-      }
-    });
-  });
-
-  request.on('error', (err) => {
-    console.error('Request error:', err);
-    res.status(500).json({ error: err.message });
-  });
-
-  request.write(payload);
-  request.end();
+  tryModel(0);
 });
 
 // Template catalog
