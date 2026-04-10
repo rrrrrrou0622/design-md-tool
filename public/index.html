@@ -796,17 +796,35 @@ async function analyzeImage(dataUrl){
       ctx.drawImage(img,0,0,canvas.width,canvas.height);
       const imageData=ctx.getImageData(0,0,canvas.width,canvas.height).data;
 
-      // Bucket colors into groups (quantize to reduce noise)
+      // Detect pure-black/pure-white borders and crop them (ignore edges that are uniform)
+      const w=canvas.width,h=canvas.height;
+      const isEdgePixel=(x,y)=>{
+        const idx=(y*w+x)*4;
+        const r=imageData[idx],g=imageData[idx+1],b=imageData[idx+2];
+        // Near-pure black or pure white — likely padding/letterboxing
+        return (r<10&&g<10&&b<10)||(r>245&&g>245&&b>245);
+      };
+      // Find content bounds (skip edge letterboxing)
+      let minX=0,maxX=w-1,minY=0,maxY=h-1;
+      for(let x=0;x<w/2;x++){let hit=false;for(let y=0;y<h;y++){if(!isEdgePixel(x,y)){hit=true;break}}if(hit){minX=x;break}}
+      for(let x=w-1;x>w/2;x--){let hit=false;for(let y=0;y<h;y++){if(!isEdgePixel(x,y)){hit=true;break}}if(hit){maxX=x;break}}
+      for(let y=0;y<h/2;y++){let hit=false;for(let x=minX;x<=maxX;x++){if(!isEdgePixel(x,y)){hit=true;break}}if(hit){minY=y;break}}
+      for(let y=h-1;y>h/2;y--){let hit=false;for(let x=minX;x<=maxX;x++){if(!isEdgePixel(x,y)){hit=true;break}}if(hit){maxY=y;break}}
+
+      // Bucket colors into groups (quantize to reduce noise, clamp to 255 to avoid #100 bug)
       const buckets=new Map();
-      for(let i=0;i<imageData.length;i+=4){
-        const a=imageData[i+3];
-        if(a<200)continue;
-        // Quantize to 16 levels per channel (reduces to manageable set)
-        const r=Math.round(imageData[i]/16)*16;
-        const g=Math.round(imageData[i+1]/16)*16;
-        const b=Math.round(imageData[i+2]/16)*16;
-        const key=`${r},${g},${b}`;
-        buckets.set(key,(buckets.get(key)||0)+1);
+      for(let y=minY;y<=maxY;y++){
+        for(let x=minX;x<=maxX;x++){
+          const i=(y*w+x)*4;
+          const a=imageData[i+3];
+          if(a<200)continue;
+          // Quantize to 16 levels using floor (keeps values in 0-240 range, always valid hex)
+          const r=Math.floor(imageData[i]/16)*16;
+          const g=Math.floor(imageData[i+1]/16)*16;
+          const b=Math.floor(imageData[i+2]/16)*16;
+          const key=`${r},${g},${b}`;
+          buckets.set(key,(buckets.get(key)||0)+1);
+        }
       }
 
       // Sort by frequency
