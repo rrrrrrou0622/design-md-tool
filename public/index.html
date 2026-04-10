@@ -2,240 +2,480 @@
 <html lang="zh-CN">
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
   <title>DesignMD — 设计语言提取器</title>
   <style>
     @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&family=Noto+Sans+SC:wght@300;400;500;600;700&display=swap');
-    *{margin:0;padding:0;box-sizing:border-box}
+    *{margin:0;padding:0;box-sizing:border-box;-webkit-tap-highlight-color:transparent}
     :root{
-      --bg:#0e0e12;--surface:#1a1a22;--surface2:#16161c;--surface3:#222230;
-      --border:#2a2a33;--border2:#333;--text:#e8e8e8;--text2:#ccc;--text3:#999;
-      --muted:#777;--muted2:#666;--muted3:#555;--primary:#7C5CFC;--primary-hover:#6B4AEE;
-      --primary-dim:rgba(124,92,252,0.12);--green:#22c55e;--red:#ef4444;--amber:#f59e0b;
-      --blue:#5CAAFC;--cyan:#06b6d4;--pink:#ec4899;--purple:#a855f7;--orange:#f97316;
-      --mono:'JetBrains Mono',monospace;--sans:'Inter','Noto Sans SC',-apple-system,sans-serif;
+      --bg:#0a0a0f;--surface:#15151c;--surface2:#1a1a22;--surface3:#1e1e26;
+      --border:#2a2a33;--border2:#1a1a20;--text:#fafafa;--text2:#e4e4e7;
+      --text3:#a1a1aa;--muted:#71717a;--muted2:#52525b;--muted3:#3f3f46;
+      --primary:#a78bfa;--primary2:#7C5CFC;--primary-hover:#8b6aff;
+      --primary-dim:rgba(167,139,250,0.12);--primary-glow:rgba(124,92,252,0.25);
+      --green:#22c55e;--red:#ef4444;--amber:#f59e0b;--blue:#5CAAFC;
+      --cyan:#06b6d4;--pink:#ec4899;--purple:#a855f7;--orange:#f97316;
+      --mono:'JetBrains Mono',ui-monospace,monospace;
+      --sans:'Inter','Noto Sans SC',-apple-system,sans-serif;
       --radius:12px;
     }
-    body{font-family:var(--sans);background:var(--bg);color:var(--text);height:100vh;display:flex;flex-direction:column;overflow:hidden}
-    ::-webkit-scrollbar{width:5px}::-webkit-scrollbar-track{background:transparent}::-webkit-scrollbar-thumb{background:var(--border);border-radius:3px}
+    html,body{font-family:var(--sans);background:var(--bg);color:var(--text);min-height:100vh}
+    body{display:flex;flex-direction:column;overflow:hidden;height:100vh}
+    ::-webkit-scrollbar{width:6px;height:6px}
+    ::-webkit-scrollbar-track{background:transparent}
+    ::-webkit-scrollbar-thumb{background:var(--border);border-radius:3px}
+    button{font-family:inherit;cursor:pointer;border:none;background:none;color:inherit}
+    input,textarea{font-family:inherit;color:inherit}
 
-    /* Top Bar */
-    .top-bar{display:flex;align-items:center;gap:12px;padding:0 16px;height:52px;background:var(--surface2);border-bottom:1px solid var(--border);flex-shrink:0}
-    .logo{display:flex;align-items:center;gap:8px;flex-shrink:0;cursor:pointer}
-    .logo svg{color:var(--primary)}.logo span{font-size:15px;font-weight:600}
-    .sep{width:1px;height:20px;background:var(--border);flex-shrink:0}
-    .tab-bar{display:flex;gap:2px;flex-shrink:0}
-    .tab{padding:6px 12px;font-size:12px;font-weight:500;color:var(--muted);cursor:pointer;border-radius:6px;transition:all .15s;display:flex;align-items:center;gap:5px}
-    .tab:hover{color:var(--text3);background:var(--surface3)}.tab.active{color:var(--text);background:var(--primary-dim)}.tab.active svg{color:var(--primary)}
-    .url-bar{display:flex;align-items:center;gap:8px;flex:1;height:32px;background:var(--bg);border:1px solid var(--border);border-radius:8px;padding:0 10px;transition:border-color .2s}
-    .url-bar:focus-within{border-color:var(--primary)}.url-bar svg{color:var(--muted);flex-shrink:0}
-    .url-bar input{flex:1;background:none;border:none;color:var(--text);font-size:12px;font-family:var(--sans);outline:none}.url-bar input::placeholder{color:var(--muted3)}
-    .btn{display:flex;align-items:center;gap:5px;height:32px;padding:0 14px;background:var(--primary);color:#fff;border:none;border-radius:8px;font-size:12px;font-weight:500;font-family:var(--sans);cursor:pointer;transition:background .15s;flex-shrink:0}
-    .btn:hover{background:var(--primary-hover)}.btn:disabled{opacity:.4;cursor:not-allowed}.btn.loading svg{animation:spin .8s linear infinite}
-    .btn-secondary{background:var(--surface);border:1px solid var(--border);color:var(--text3)}.btn-secondary:hover{border-color:var(--muted)}
+    .nav{display:flex;align-items:center;gap:16px;padding:0 24px;height:56px;flex-shrink:0;border-bottom:1px solid var(--border2)}
+    .logo{display:flex;align-items:center;gap:8px;cursor:pointer;flex-shrink:0}
+    .logo svg{color:var(--primary)}
+    .logo-text{font-size:16px;font-weight:600;color:var(--text)}
+    .nav-sep{width:1px;height:20px;background:var(--border);flex-shrink:0}
+    .nav-spacer{flex:1}
+    .nav-link{font-size:13px;font-weight:500;color:var(--text3);cursor:pointer;transition:color .15s}
+    .nav-link:hover{color:var(--text)}
+    .nav-link.active{color:var(--primary)}
+    .nav-btn{display:flex;align-items:center;gap:5px;height:32px;padding:0 12px;background:var(--surface);border:1px solid var(--border);border-radius:8px;font-size:12px;font-weight:500;color:var(--text3);transition:all .15s}
+    .nav-btn:hover{border-color:var(--muted)}
+
+    .main{flex:1;overflow:hidden;display:flex;flex-direction:column}
+    .view{display:none;flex:1;overflow:hidden;flex-direction:column;width:100%}
+    .view.active{display:flex}
+
+    /* Home View */
+    #homeView{align-items:center;justify-content:flex-start;padding:60px 32px 40px 32px;gap:28px;overflow-y:auto}
+    .hero-badge{display:inline-flex;align-items:center;gap:6px;height:26px;background:var(--primary-dim);border:1px solid rgba(167,139,250,0.25);border-radius:20px;padding:0 12px;flex-shrink:0}
+    .hero-badge-dot{width:6px;height:6px;border-radius:50%;background:var(--primary)}
+    .hero-badge span{font-size:11px;font-weight:500;color:#c4b5fd}
+    .hero-title{text-align:center;font-size:52px;font-weight:600;letter-spacing:-1.5px;line-height:1.1;flex-shrink:0}
+    .hero-title .accent{color:var(--primary);display:block}
+    .hero-sub{max-width:680px;font-size:14px;color:var(--text3);text-align:center;line-height:1.6}
+    .prompt-box{width:100%;max-width:720px;background:var(--surface);border:1px solid var(--border);border-radius:16px;padding:16px;display:flex;flex-direction:column;gap:12px;box-shadow:0 20px 60px -20px var(--primary-glow),0 8px 24px rgba(0,0,0,0.4);flex-shrink:0}
+    .prompt-input{width:100%;background:none;border:none;outline:none;resize:none;font-size:15px;line-height:1.5;color:var(--text);min-height:48px;font-family:var(--sans)}
+    .prompt-input::placeholder{color:var(--muted2)}
+    .prompt-bottom{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+    .prompt-tool{display:flex;align-items:center;gap:5px;height:30px;background:var(--surface3);border:1px solid var(--border);border-radius:7px;padding:0 10px;font-size:11px;font-weight:500;color:var(--text3);transition:all .15s}
+    .prompt-tool:hover{border-color:var(--muted);color:var(--text2)}
+    .prompt-tool svg{color:var(--text3)}
+    .prompt-bottom-spacer{flex:1;min-width:0}
+    .prompt-gen{display:flex;align-items:center;gap:5px;height:34px;padding:0 16px;background:var(--primary2);color:#fff;border-radius:8px;font-size:13px;font-weight:600;transition:background .15s;flex-shrink:0}
+    .prompt-gen:hover{background:var(--primary-hover)}
+    .prompt-gen:disabled{opacity:.5;cursor:not-allowed}
+    .prompt-gen.loading svg{animation:spin .8s linear infinite}
     @keyframes spin{to{transform:rotate(360deg)}}
+    .suggestions{display:flex;gap:8px;flex-wrap:wrap;justify-content:center}
+    .sug-chip{display:flex;align-items:center;gap:6px;height:30px;background:var(--surface);border:1px solid var(--border);border-radius:20px;padding:0 14px;font-size:11px;color:var(--text2);transition:all .15s}
+    .sug-chip:hover{border-color:var(--primary);color:var(--primary)}
 
-    /* Main */
-    .main{display:flex;flex:1;overflow:hidden}
+    /* Gallery View */
+    #galleryView{flex-direction:row}
+    .gal-side{width:220px;flex-shrink:0;padding:20px 16px 20px 20px;border-right:1px solid var(--border2);display:flex;flex-direction:column;gap:4px;overflow-y:auto}
+    .gal-side-label{font-size:10px;font-weight:600;font-family:var(--mono);color:var(--muted2);letter-spacing:1px;margin-bottom:8px}
+    .gal-cat{display:flex;align-items:center;gap:8px;height:32px;border-radius:7px;padding:0 10px;font-size:12px;font-weight:500;color:var(--text3);cursor:pointer;transition:all .15s}
+    .gal-cat:hover{background:var(--surface)}
+    .gal-cat.active{background:var(--primary-dim);color:var(--text)}
+    .gal-cat.active svg{color:var(--primary)}
+    .gal-cat svg{color:var(--muted);flex-shrink:0}
+    .gal-cat span:first-of-type{flex:1}
+    .gal-cat-count{font-size:10px;font-family:var(--mono);color:var(--muted2)}
+    .gal-main{flex:1;padding:24px 32px;overflow-y:auto;display:flex;flex-direction:column;gap:20px}
+    .gal-header h2{font-size:22px;font-weight:600;letter-spacing:-0.4px;margin-bottom:4px}
+    .gal-header p{font-size:12px;color:var(--muted)}
+    .gal-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:14px}
+    .tpl-card{display:flex;flex-direction:column;gap:10px;padding:16px;background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);cursor:pointer;transition:all .2s}
+    .tpl-card:hover{border-color:var(--primary);transform:translateY(-2px);box-shadow:0 8px 24px rgba(124,92,252,0.2)}
+    .tpl-card-head{display:flex;align-items:center;justify-content:space-between}
+    .tpl-card-cat{font-size:9px;font-weight:600;font-family:var(--mono);color:var(--primary);letter-spacing:0.8px;text-transform:uppercase}
+    .tpl-card-swatches{display:flex;gap:3px}
+    .tpl-card-swatch{width:14px;height:14px;border-radius:3px}
+    .tpl-card-swatch.light{border:1px solid var(--border)}
+    .tpl-card-name{font-size:14px;font-weight:600;color:var(--text)}
+    .tpl-card-desc{font-size:11px;color:var(--muted)}
 
-    /* Gallery */
-    .gallery{display:none;flex-direction:column;width:100%;height:100%;overflow:hidden}.gallery.active{display:flex}
-    .gallery-header{padding:24px 32px 16px;flex-shrink:0}
-    .gallery-header h2{font-size:20px;font-weight:600;margin-bottom:4px}.gallery-header p{font-size:13px;color:var(--muted)}
-    .gallery-filters{display:flex;gap:6px;padding:0 32px 16px;flex-wrap:wrap;flex-shrink:0}
-    .chip{padding:4px 10px;font-size:11px;font-weight:500;color:var(--muted);background:var(--bg);border:1px solid var(--border);border-radius:20px;cursor:pointer;transition:all .15s}
-    .chip:hover{border-color:var(--muted);color:var(--text3)}.chip.active{border-color:var(--primary);color:var(--primary);background:var(--primary-dim)}
-    .gallery-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:12px;padding:0 32px 32px;overflow-y:auto;flex:1}
-    .tpl-card{display:flex;flex-direction:column;gap:8px;padding:16px;background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);cursor:pointer;transition:all .2s}
-    .tpl-card:hover{border-color:var(--primary);transform:translateY(-2px)}.tpl-card .tpl-cat{font-size:10px;font-weight:500;font-family:var(--mono);color:var(--primary);text-transform:uppercase;letter-spacing:.5px}
-    .tpl-card .tpl-name{font-size:14px;font-weight:600}.tpl-card .tpl-desc{font-size:11px;color:var(--muted)}
+    /* Editor View */
+    #editorView{flex-direction:column}
+    .editor-top{display:flex;align-items:center;gap:12px;padding:0 16px;height:52px;border-bottom:1px solid var(--border2);flex-shrink:0}
+    .editor-bc{display:flex;align-items:center;gap:6px;font-size:12px;color:var(--muted)}
+    .editor-bc svg{cursor:pointer;color:var(--muted)}
+    .editor-bc span{cursor:pointer}
+    .editor-bc .bc-current{color:var(--text);font-weight:600;cursor:default;display:flex;align-items:center;gap:5px}
+    .editor-bc .bc-dot{width:8px;height:8px;border-radius:2px;background:var(--primary2);display:inline-block}
+    .editor-canvas{flex:1;overflow:auto;position:relative;background:var(--bg);background-image:radial-gradient(circle,var(--surface) 1px,transparent 1px);background-size:24px 24px}
+    .canvas-inner{position:relative;width:1480px;min-height:1000px;padding:24px}
+    .sec-card{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:18px;display:flex;flex-direction:column;gap:12px;box-shadow:0 8px 24px rgba(0,0,0,0.3);transition:border-color .2s}
+    .sec-card:hover{border-color:var(--muted3)}
+    .sec-header{display:flex;align-items:center;gap:6px}
+    .sec-dot{width:8px;height:8px;border-radius:50%;flex-shrink:0}
+    .sec-title{font-size:13px;font-weight:600;color:var(--text)}
+    .sec-header-spacer{flex:1}
+    .sec-edit{color:var(--muted2);cursor:pointer;transition:color .15s;display:flex}
+    .sec-edit:hover{color:var(--text3)}
+    .sec-desc{font-size:12px;line-height:1.5;color:var(--text3)}
+    .sec-tags{display:flex;gap:5px;flex-wrap:wrap}
+    .sec-tag{padding:2px 8px;font-size:9px;font-weight:500;background:var(--primary-dim);color:#c4b5fd;border-radius:4px}
 
-    /* Editor */
-    .editor-view{display:none;width:100%;height:100%;flex-direction:column}.editor-view.active{display:flex}
-    .editor-topbar{display:flex;align-items:center;gap:10px;padding:0 16px;height:42px;background:var(--surface2);border-bottom:1px solid var(--border);flex-shrink:0}
-    .breadcrumb{display:flex;align-items:center;gap:6px;font-size:12px;color:var(--muted)}.breadcrumb .bc-current{color:var(--text);font-weight:500}
-    .editor-topbar .spacer{flex:1}
-    .editor-body{flex:1;overflow-y:auto;padding:24px;display:flex;gap:24px}
-    .editor-col{flex:1;display:flex;flex-direction:column;gap:18px;min-width:0}
+    @media (min-width:769px){
+      .sec-card{position:absolute}
+      .sec-card[data-sec="1"]{width:300px;left:24px;top:24px}
+      .sec-card[data-sec="2"]{width:360px;left:360px;top:24px}
+      .sec-card[data-sec="3"]{width:320px;left:756px;top:24px}
+      .sec-card[data-sec="4"]{width:300px;left:1100px;top:24px}
+      .sec-card[data-sec="5"]{width:280px;left:24px;top:340px}
+      .sec-card[data-sec="6"]{width:340px;left:336px;top:340px}
+      .sec-card[data-sec="8"]{width:300px;left:708px;top:340px}
+      .sec-card[data-sec="7"]{width:320px;left:1044px;top:340px}
+      .sec-card[data-sec="9"]{width:440px;left:24px;top:640px}
+    }
 
-    /* Section Cards */
-    .sec-card{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:18px;display:flex;flex-direction:column;gap:12px;transition:border-color .2s}
-    .sec-card:hover{border-color:#444}
-    .sec-header{display:flex;align-items:center;gap:6px}.sec-dot{width:8px;height:8px;border-radius:50%;flex-shrink:0}
-    .sec-title{font-size:14px;font-weight:600}.sec-desc{font-size:13px;line-height:1.6;color:var(--text3)}
-    .sec-tags{display:flex;gap:6px;flex-wrap:wrap}
-    .sec-tag{padding:2px 8px;font-size:10px;font-weight:500;background:#2a2244;color:#9580fc;border-radius:5px}
+    .canvas-chat{position:fixed;bottom:20px;left:20px;width:380px;max-width:calc(100vw - 40px);background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:12px 14px;display:flex;flex-direction:column;gap:8px;box-shadow:0 20px 40px -10px rgba(124,92,252,0.35),0 0 0 1px rgba(167,139,250,0.1);z-index:50}
+    .canvas-chat-head{display:flex;align-items:center;gap:6px}
+    .canvas-chat-head svg{color:var(--primary)}
+    .canvas-chat-title{font-size:11px;font-weight:600;color:var(--text);flex:1}
+    .canvas-chat-kbd{display:flex;align-items:center;height:18px;padding:0 6px;background:var(--surface3);border:1px solid var(--border);border-radius:4px;font-size:9px;font-family:var(--mono);color:var(--muted)}
+    .canvas-chat-input{width:100%;background:none;border:none;outline:none;font-size:12px;color:var(--text);font-family:var(--sans)}
+    .canvas-chat-input::placeholder{color:var(--muted2)}
 
-    /* Color swatches */
     .swatch-header{display:flex;align-items:center;justify-content:space-between}
-    .swatch-add{font-size:10px;font-weight:500;color:var(--muted);cursor:pointer}.swatch-add:hover{color:var(--text3)}
-    .swatch-grid{display:flex;gap:10px}.swatch-item{flex:1;display:flex;flex-direction:column;align-items:center;gap:5px}
-    .swatch-color{width:100%;height:52px;border-radius:8px;cursor:pointer;transition:transform .12s;border:1px solid transparent}.swatch-color:hover{transform:scale(1.05)}
-    .swatch-color.dark{border-color:var(--border)}.swatch-name{font-size:10px;color:var(--text3)}.swatch-hex{font-size:9px;font-family:var(--mono);color:var(--muted2)}
-
-    /* Typography samples */
-    .typo-sample{display:flex;flex-direction:column;gap:3px}.typo-meta{font-size:10px;font-family:var(--mono);color:var(--muted2)}
-
-    /* Component preview */
-    .comp-btns{display:flex;gap:10px;flex-wrap:wrap}
-    .comp-btn-primary{padding:8px 16px;border-radius:4px;font-size:13px;border:none;cursor:default}
-    .comp-btn-ghost{padding:8px 16px;border-radius:4px;font-size:13px;background:transparent;cursor:default}
-    .comp-card-preview{padding:14px;background:var(--bg);border:1px solid var(--border);border-radius:6px;display:flex;flex-direction:column;gap:4px}
-    .comp-card-title{font-size:14px;font-weight:300;color:var(--text)}.comp-card-desc{font-size:11px;color:var(--muted)}
-
-    /* Spacing */
-    .spacing-row{display:flex;gap:10px;align-items:flex-end;flex-wrap:wrap}.spacing-item{display:flex;flex-direction:column;align-items:center;gap:4px}
-    .spacing-box{background:var(--primary);border-radius:2px;opacity:.6}.spacing-label{font-size:9px;font-family:var(--mono);color:var(--muted2)}
-    .radius-row{display:flex;gap:10px;align-items:flex-end;flex-wrap:wrap}.radius-item{display:flex;flex-direction:column;align-items:center;gap:4px}
-    .radius-box{width:36px;height:36px;border:2px solid var(--primary);opacity:.6}.radius-label{font-size:9px;font-family:var(--mono);color:var(--muted2)}
-
-    /* Depth */
-    .depth-row{display:flex;gap:12px}.depth-item{flex:1;display:flex;flex-direction:column;align-items:center;gap:4px}
-    .depth-box{width:100%;height:56px;background:var(--surface3);border-radius:8px}.depth-label{font-size:9px;font-family:var(--mono);color:var(--muted2)}
-
-    /* Do/Don't */
-    .dd-row{display:flex;gap:10px}.dd-box{flex:1;padding:12px;border-radius:8px;font-size:11px;line-height:1.7}
-    .dd-do{background:#0d2818;border:1px solid #1a4a2e;color:#4ade80}.dd-dont{background:#2a0d0d;border:1px solid #4a1a1a;color:#f87171}
-    .dd-title{font-size:12px;font-weight:600;margin-bottom:6px}
-
-    /* Responsive */
-    .resp-row{display:flex;gap:8px}.resp-item{flex:1;padding:10px;background:var(--surface3);border-radius:8px;display:flex;flex-direction:column;align-items:center;gap:6px}
-    .resp-item svg{color:var(--purple)}.resp-name{font-size:11px;font-weight:500;color:var(--text2)}.resp-size{font-size:9px;font-family:var(--mono);color:var(--muted2)}
-
-    /* Agent Guide */
+    .swatch-add{font-size:10px;font-weight:500;color:var(--muted);cursor:pointer}
+    .swatch-grid{display:flex;gap:8px}
+    .swatch-item{flex:1;display:flex;flex-direction:column;align-items:center;gap:4px;min-width:0}
+    .swatch-color{width:100%;height:44px;border-radius:6px;cursor:pointer;transition:transform .12s}
+    .swatch-color:hover{transform:scale(1.05)}
+    .swatch-color.light{border:1px solid var(--border)}
+    .swatch-name{font-size:9px;color:var(--text3);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:100%}
+    .typo-sample{display:flex;flex-direction:column;gap:2px}
+    .typo-meta{font-size:9px;font-family:var(--mono);color:var(--muted2)}
+    .comp-btns{display:flex;gap:8px;flex-wrap:wrap}
+    .comp-btn-primary{padding:8px 14px;border-radius:4px;font-size:12px;color:#fff;cursor:default}
+    .comp-btn-ghost{padding:8px 14px;border-radius:4px;font-size:12px;background:transparent;cursor:default}
+    .comp-card-preview{padding:12px;background:var(--surface2);border:1px solid var(--border);border-radius:6px;display:flex;flex-direction:column;gap:4px}
+    .comp-card-preview .ct{font-size:13px;font-weight:300;color:var(--text2)}
+    .comp-card-preview .cd{font-size:10px;color:var(--muted)}
+    .spacing-row{display:flex;gap:10px;align-items:flex-end;flex-wrap:wrap}
+    .sp-item{display:flex;flex-direction:column;align-items:center;gap:3px}
+    .sp-box{background:var(--primary);border-radius:2px;opacity:.6}
+    .sp-label{font-size:9px;font-family:var(--mono);color:var(--muted2)}
+    .depth-row{display:flex;gap:10px}
+    .depth-item{flex:1;display:flex;flex-direction:column;align-items:center;gap:4px;min-width:0}
+    .depth-box{width:100%;height:44px;background:var(--surface3);border-radius:6px}
+    .depth-label{font-size:9px;font-family:var(--mono);color:var(--muted2)}
+    .resp-row{display:flex;gap:8px}
+    .resp-item{flex:1;padding:10px 8px;background:var(--surface3);border-radius:7px;display:flex;flex-direction:column;align-items:center;gap:4px}
+    .resp-item svg{color:var(--purple)}
+    .resp-name{font-size:10px;font-weight:500;color:var(--text2)}
+    .resp-size{font-size:8px;font-family:var(--mono);color:var(--muted2)}
+    .dd-wrap{display:flex;flex-direction:column;gap:8px}
+    .dd-box{padding:10px;border-radius:6px;display:flex;flex-direction:column;gap:4px}
+    .dd-do{background:rgba(34,197,94,0.06);border:1px solid rgba(34,197,94,0.15)}
+    .dd-dont{background:rgba(239,68,68,0.06);border:1px solid rgba(239,68,68,0.15)}
+    .dd-title{font-size:10px;font-weight:600;margin-bottom:2px}
+    .dd-do .dd-title{color:var(--green)}
+    .dd-dont .dd-title{color:var(--red)}
+    .dd-box div:not(.dd-title){font-size:10px;line-height:1.5}
+    .dd-do div:not(.dd-title){color:#4ade80}
+    .dd-dont div:not(.dd-title){color:#f87171}
     .agent-refs{display:flex;flex-direction:column;gap:4px;font-size:11px;color:var(--text2)}
-    .agent-code{padding:12px;background:var(--bg);border-radius:8px;font-size:10px;font-family:var(--mono);color:var(--text3);line-height:1.7;display:flex;flex-direction:column;gap:2px}
+    .agent-refs code{font-size:10px;background:var(--bg);padding:1px 4px;border-radius:3px;font-family:var(--mono)}
+    .agent-code{padding:12px;background:var(--bg);border-radius:6px;font-size:10px;font-family:var(--mono);color:var(--text3);line-height:1.7;display:flex;flex-direction:column;gap:2px;margin-top:8px}
 
-    /* Command Bar */
-    .command-bar{display:flex;align-items:center;gap:10px;padding:0 16px;height:42px;background:var(--surface2);border-top:1px solid var(--border);flex-shrink:0}
-    .command-bar svg{color:var(--primary);flex-shrink:0}
-    .command-bar input{flex:1;background:none;border:none;color:var(--text);font-size:12px;font-family:var(--sans);outline:none}.command-bar input::placeholder{color:var(--muted3)}
-    .kbd{display:flex;align-items:center;height:22px;padding:0 6px;background:var(--bg);border:1px solid var(--border);border-radius:4px;font-size:10px;font-family:var(--mono);color:var(--muted2);flex-shrink:0}
+    .empty-state{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:10px;color:var(--muted);padding:40px}
+    .empty-state svg{opacity:.2}
+    .empty-state p{font-size:13px}
 
-    /* Toast */
-    .toast{position:fixed;bottom:56px;left:50%;transform:translateX(-50%) translateY(16px);background:var(--surface3);color:var(--text);padding:8px 16px;border-radius:8px;font-size:12px;border:1px solid var(--border);opacity:0;transition:all .25s;pointer-events:none;z-index:100}.toast.show{opacity:1;transform:translateX(-50%) translateY(0)}
+    .toast{position:fixed;bottom:20px;left:50%;transform:translateX(-50%) translateY(16px);background:var(--surface2);color:var(--text);padding:10px 18px;border-radius:10px;font-size:12px;border:1px solid var(--border);opacity:0;transition:all .25s;pointer-events:none;z-index:1000;box-shadow:0 8px 24px rgba(0,0,0,0.4)}
+    .toast.show{opacity:1;transform:translateX(-50%) translateY(0)}
 
-    /* Hidden textarea for raw MD */
-    .raw-md{display:none}
+    @media (max-width:768px){
+      .nav{padding:0 16px;height:52px;gap:10px}
+      .logo-text{font-size:15px}
+      .nav-link{display:none}
+      .nav-sep{display:none}
+
+      #homeView{padding:32px 20px 24px 20px;gap:20px}
+      .hero-badge{height:24px;padding:0 10px}
+      .hero-badge span{font-size:10px}
+      .hero-title{font-size:30px;letter-spacing:-0.8px}
+      .hero-sub{font-size:13px;max-width:300px}
+      .prompt-box{padding:14px;gap:10px}
+      .prompt-input{font-size:14px;min-height:44px}
+      .prompt-tool{height:28px;padding:0 8px}
+      .prompt-tool span{display:none}
+      .prompt-gen{height:32px;padding:0 14px;font-size:12px}
+      .sug-chip{height:28px;padding:0 12px;font-size:10px}
+
+      #galleryView{flex-direction:column}
+      .gal-side{width:100%;height:auto;flex-shrink:0;padding:10px 16px;border-right:none;border-bottom:1px solid var(--border2);flex-direction:row;gap:6px;overflow-x:auto;overflow-y:hidden;scrollbar-width:none}
+      .gal-side::-webkit-scrollbar{display:none}
+      .gal-side-label{display:none}
+      .gal-cat{flex-shrink:0;height:28px;padding:0 12px;border-radius:20px;border:1px solid var(--border);font-size:11px}
+      .gal-cat svg{display:none}
+      .gal-cat-count{display:none}
+      .gal-cat span:first-of-type{flex:none}
+      .gal-main{padding:16px}
+      .gal-header h2{font-size:18px}
+      .gal-grid{grid-template-columns:repeat(2,1fr);gap:10px}
+      .tpl-card{padding:14px;gap:8px}
+      .tpl-card-swatch{width:12px;height:12px}
+      .tpl-card-name{font-size:13px}
+      .tpl-card-desc{font-size:10px}
+
+      #editorView{flex-direction:column}
+      .editor-top{padding:0 16px;height:52px}
+      .editor-canvas{background:var(--bg);overflow-y:auto;overflow-x:hidden;background-image:none}
+      .canvas-inner{width:100%;padding:16px 16px 80px 16px;display:flex;flex-direction:column;gap:12px;min-height:auto}
+      .sec-card{position:static!important;width:100%!important;left:auto!important;top:auto!important;padding:14px;gap:10px}
+      .sec-title{font-size:12px}
+      .sec-desc{font-size:11px}
+      .canvas-chat{position:fixed;bottom:0;left:0;width:100%;max-width:none;border-radius:0;border-left:none;border-right:none;border-bottom:none;box-shadow:0 -8px 24px rgba(0,0,0,0.5);padding:10px 16px}
+      .canvas-chat-title{display:none}
+      .canvas-chat-kbd{display:none}
+    }
   </style>
 </head>
 <body>
-  <div class="top-bar">
-    <div class="logo" onclick="showView('gallery')">
-      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="13.5" cy="6.5" r="2.5"/><circle cx="17.5" cy="15.5" r="2.5"/><circle cx="8.5" cy="15.5" r="2.5"/><path d="M12 2C6.5 2 2 6.5 2 12s4.5 10 10 10 10-4.5 10-10S17.5 2 12 2"/></svg>
-      <span>DesignMD</span>
+
+  <nav class="nav">
+    <div class="logo" onclick="showView('home')">
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="13.5" cy="6.5" r="2.5"/><circle cx="17.5" cy="15.5" r="2.5"/><circle cx="8.5" cy="15.5" r="2.5"/><path d="M12 2C6.5 2 2 6.5 2 12s4.5 10 10 10 10-4.5 10-10S17.5 2 12 2"/></svg>
+      <span class="logo-text">DesignMD</span>
     </div>
-    <div class="sep"></div>
-    <div class="tab-bar">
-      <div class="tab active" data-view="gallery" onclick="showView('gallery')">
-        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></svg>
-        模版库
-      </div>
-      <div class="tab" data-view="editor" onclick="showView('editor')">
-        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14.5 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7.5L14.5 2z"/><polyline points="14,2 14,8 20,8"/></svg>
-        编辑器
-      </div>
-    </div>
-    <div class="url-bar">
-      <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/></svg>
-      <input type="url" id="urlInput" placeholder="粘贴网址提取设计语言..." autocomplete="off" spellcheck="false">
-    </div>
-    <button class="btn" id="extractBtn" onclick="extractDesign()">
-      <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 7V5a2 2 0 0 1 2-2h2"/><path d="M17 3h2a2 2 0 0 1 2 2v2"/><path d="M21 17v2a2 2 0 0 1-2 2h-2"/><path d="M7 21H5a2 2 0 0 1-2-2v-2"/></svg>
-      提取
+    <div class="nav-sep"></div>
+    <div class="nav-link" data-view="home" onclick="showView('home')">首页</div>
+    <div class="nav-link" data-view="gallery" onclick="showView('gallery')">模版库</div>
+    <div class="nav-spacer"></div>
+    <button class="nav-btn" onclick="window.open('https://github.com/rrrrrrou0622/design-md-tool','_blank')">
+      <svg width="13" height="13" viewBox="0 0 24 24" fill="currentColor"><path d="M12 0C5.37 0 0 5.37 0 12c0 5.3 3.44 9.8 8.2 11.39.6.11.82-.26.82-.58v-2.17c-3.34.73-4.04-1.6-4.04-1.6-.54-1.39-1.34-1.76-1.34-1.76-1.09-.75.08-.73.08-.73 1.21.08 1.84 1.24 1.84 1.24 1.07 1.84 2.81 1.31 3.5 1 .11-.78.42-1.31.76-1.61-2.67-.3-5.47-1.33-5.47-5.93 0-1.31.47-2.38 1.24-3.22-.13-.3-.54-1.52.11-3.18 0 0 1.01-.32 3.3 1.23a11.5 11.5 0 016 0c2.29-1.55 3.3-1.23 3.3-1.23.65 1.66.24 2.88.12 3.18.77.84 1.24 1.91 1.24 3.22 0 4.61-2.81 5.63-5.49 5.92.43.37.81 1.1.81 2.22v3.29c0 .32.22.69.83.58C20.57 21.8 24 17.3 24 12c0-6.63-5.37-12-12-12z"/></svg>
+      <span>Star</span>
     </button>
-  </div>
+  </nav>
 
   <div class="main">
-    <!-- Gallery -->
-    <div class="gallery active" id="galleryView">
-      <div class="gallery-header"><h2>设计系统模版库</h2><p>59 个精选 DESIGN.md 文件，来自顶级产品。点击加载到编辑器。</p></div>
-      <div class="gallery-filters" id="galleryFilters"></div>
-      <div class="gallery-grid" id="galleryGrid"></div>
-    </div>
 
-    <!-- Editor -->
-    <div class="editor-view" id="editorView">
-      <div class="editor-topbar">
-        <div class="breadcrumb">
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="cursor:pointer" onclick="showView('gallery')"><polyline points="15,18 9,12 15,6"/></svg>
-          <span style="cursor:pointer" onclick="showView('gallery')">模版库</span>
-          <span>/</span>
-          <span class="bc-current" id="bcName">—</span>
+    <div class="view active" id="homeView">
+      <div class="hero-badge"><div class="hero-badge-dot"></div><span>基于 Google Stitch DESIGN.md 标准</span></div>
+      <h1 class="hero-title">把任何网站的设计语言<span class="accent">变成 AI 能读懂的文件</span></h1>
+      <p class="hero-sub">粘贴网址 · 选择模版 · 直接描述。AI 生成完整 DESIGN.md，Claude Code / Cursor 里直接用。</p>
+      <div class="prompt-box">
+        <textarea class="prompt-input" id="promptInput" placeholder="粘贴一个网址，或者告诉我你想要什么风格的设计系统..." rows="2"></textarea>
+        <div class="prompt-bottom">
+          <button class="prompt-tool" onclick="pickFile()">
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="9" cy="9" r="2"/><path d="m21 15-3.086-3.086a2 2 0 0 0-2.828 0L6 21"/></svg>
+            <span>截图</span>
+          </button>
+          <button class="prompt-tool" onclick="focusUrl()">
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/></svg>
+            <span>网址</span>
+          </button>
+          <button class="prompt-tool" onclick="toggleMic()">
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="2" width="6" height="12" rx="3"/><path d="M5 10a7 7 0 0 0 14 0"/><line x1="12" y1="17" x2="12" y2="22"/></svg>
+            <span>语音</span>
+          </button>
+          <div class="prompt-bottom-spacer"></div>
+          <button class="prompt-gen" id="genBtn" onclick="handleGenerate()">
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="m12 3-1.9 5.8a2 2 0 0 1-1.3 1.3L3 12l5.8 1.9a2 2 0 0 1 1.3 1.3L12 21l1.9-5.8a2 2 0 0 1 1.3-1.3L21 12l-5.8-1.9a2 2 0 0 1-1.3-1.3L12 3Z"/></svg>
+            <span>生成</span>
+          </button>
         </div>
-        <div class="spacer"></div>
-        <button class="btn btn-secondary" onclick="copyMd()"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg> 复制 MD</button>
-        <button class="btn" onclick="downloadMd()"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7,10 12,15 17,10"/><line x1="12" y1="15" x2="12" y2="3"/></svg> 下载</button>
       </div>
-      <div class="editor-body" id="editorBody">
-        <div class="editor-col" id="colLeft"></div>
-        <div class="editor-col" id="colRight"></div>
+      <div class="suggestions">
+        <button class="sug-chip" onclick="loadTemplate('linear.app')">
+          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="color:#f59e0b"><polygon points="13,2 3,14 12,14 11,22 21,10 12,10"/></svg>
+          像 Linear 那样极简
+        </button>
+        <button class="sug-chip" onclick="loadTemplate('stripe')">
+          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="color:#a78bfa"><path d="m12 3-1.9 5.8a2 2 0 0 1-1.3 1.3L3 12l5.8 1.9a2 2 0 0 1 1.3 1.3L12 21l1.9-5.8a2 2 0 0 1 1.3-1.3L21 12l-5.8-1.9a2 2 0 0 1-1.3-1.3L12 3Z"/></svg>
+          高端金融风格
+        </button>
+        <button class="sug-chip" onclick="loadTemplate('vercel')">
+          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="color:#22c55e"><polygon points="12,2 2,7 12,12 22,7"/><polyline points="2,17 12,22 22,17"/><polyline points="2,12 12,17 22,12"/></svg>
+          Bento 网格
+        </button>
       </div>
     </div>
+
+    <div class="view" id="galleryView">
+      <aside class="gal-side">
+        <div class="gal-side-label">分类</div>
+        <div id="galCats"></div>
+      </aside>
+      <main class="gal-main">
+        <div class="gal-header">
+          <h2>设计系统模版库</h2>
+          <p>59 个精选 DESIGN.md · 来自顶级产品的真实设计语言</p>
+        </div>
+        <div class="gal-grid" id="galGrid"></div>
+      </main>
+    </div>
+
+    <div class="view" id="editorView">
+      <div class="editor-top">
+        <div class="editor-bc">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" onclick="showView('gallery')"><polyline points="15,18 9,12 15,6"/></svg>
+          <span onclick="showView('gallery')">模版库</span>
+          <span style="color:var(--muted3)">/</span>
+          <div class="bc-current"><span class="bc-dot" id="bcDot"></span><span id="bcName">—</span></div>
+        </div>
+      </div>
+      <div class="editor-canvas">
+        <div class="canvas-inner" id="canvasInner">
+          <div class="empty-state">
+            <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="13.5" cy="6.5" r="2.5"/><circle cx="17.5" cy="15.5" r="2.5"/><circle cx="8.5" cy="15.5" r="2.5"/><path d="M12 2C6.5 2 2 6.5 2 12s4.5 10 10 10 10-4.5 10-10S17.5 2 12 2"/></svg>
+            <p>选择一个模版或从网址提取</p>
+          </div>
+        </div>
+      </div>
+      <div class="canvas-chat">
+        <div class="canvas-chat-head">
+          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="m12 3-1.9 5.8a2 2 0 0 1-1.3 1.3L3 12l5.8 1.9a2 2 0 0 1 1.3 1.3L12 21l1.9-5.8a2 2 0 0 1 1.3-1.3L21 12l-5.8-1.9a2 2 0 0 1-1.3-1.3L12 3Z"/></svg>
+          <span class="canvas-chat-title">告诉 AI 你想改什么</span>
+          <div class="canvas-chat-kbd">⌘ Enter</div>
+        </div>
+        <input type="text" class="canvas-chat-input" id="chatInput" placeholder='"把主色改成深蓝"  "圆角改成12px"  "加一个阴影段落"'>
+      </div>
+    </div>
+
   </div>
 
-  <div class="command-bar">
-    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="m12 3-1.9 5.8a2 2 0 0 1-1.3 1.3L3 12l5.8 1.9a2 2 0 0 1 1.3 1.3L12 21l1.9-5.8a2 2 0 0 1 1.3-1.3L21 12l-5.8-1.9a2 2 0 0 1-1.3-1.3L12 3Z"/></svg>
-    <input type="text" id="commandInput" placeholder="\"把主色改成深蓝\"  \"圆角改成12px\"  \"加一个阴影段落\"" autocomplete="off" spellcheck="false">
-    <div class="kbd">⌘ Enter</div>
-  </div>
   <div class="toast" id="toast"></div>
-  <textarea class="raw-md" id="rawMd"></textarea>
+  <textarea id="rawMd" style="display:none"></textarea>
 
 <script>
-// ─── State ────────────────────────────────────────
-let allTemplates=[], currentFilter='全部', currentDesign=null, currentName='';
+let allTemplates=[],currentFilter='全部',currentDesign=null;
 const CATEGORY_ZH={AI:'AI',Developer:'开发者',Design:'设计',Fintech:'金融',Consumer:'消费',Automotive:'汽车',Infrastructure:'基础设施',Productivity:'生产力',Enterprise:'企业'};
+const CATEGORY_ICONS={'全部':'sparkles','AI':'cpu','开发者':'code','设计':'palette','金融':'credit-card','消费':'shopping-bag','汽车':'car','基础设施':'server','生产力':'zap','企业':'building-2'};
 
-// ─── Views ────────────────────────────────────────
+const TPL_SWATCHES={
+  claude:['#C97B47','#201E1D','#F5F4EF','#8B7F75'],
+  vercel:['#000000','#FFFFFF','#0070F3','#888888'],
+  'linear.app':['#08090a','#5e6ad2','#f7f8f8','#666666'],
+  stripe:['#533afd','#061b31','#FFFFFF','#ea2261'],
+  figma:['#0ACF83','#A259FF','#F24E1E','#FF7262'],
+  apple:['#000000','#F5F5F7','#0066CC','#86868B'],
+  tesla:['#E82127','#000000','#FFFFFF','#171A20'],
+  spotify:['#1DB954','#191414','#FFFFFF','#B3B3B3'],
+  cursor:['#000000','#FFFFFF','#7C3AED','#4B5563'],
+  supabase:['#3ECF8E','#1C1C1C','#FFFFFF','#6B7280'],
+  framer:['#0099FF','#000000','#FFFFFF','#F5F5F5'],
+  notion:['#000000','#FFFFFF','#E5E5E5','#909090'],
+  airbnb:['#FF5A5F','#00A699','#FFFFFF','#484848'],
+  coinbase:['#0052FF','#000000','#FFFFFF','#B1B4B9'],
+  sentry:['#362D59','#F74E3C','#FFFFFF','#9E9CA8'],
+  posthog:['#F54E00','#000000','#FFFFFF','#F9BD2B'],
+  raycast:['#FF6363','#000000','#FFFFFF','#A8A8A8'],
+  expo:['#000000','#FFFFFF','#4630EB','#A9A9A9'],
+  lovable:['#FF3C7E','#000000','#FFFFFF','#FFB3D1'],
+  resend:['#000000','#FFFFFF','#E5E5E5','#6B7280'],
+  cohere:['#FF7B6F','#39594D','#FFFFFF','#D6D6E6'],
+  elevenlabs:['#000000','#FFFFFF','#3CEAAA','#BDBDBD'],
+  ollama:['#000000','#FFFFFF','#E5E5E5','#777777'],
+  'mistral.ai':['#FF7000','#000000','#FFFFFF','#F4B400'],
+  replicate:['#000000','#FFFFFF','#EA580C','#737373'],
+  runwayml:['#00F0B5','#000000','#FFFFFF','#A3A3A3'],
+  'x.ai':['#000000','#FFFFFF','#1DA1F2','#666666'],
+  'together.ai':['#0F6FFF','#000000','#FFFFFF','#8B9BAF'],
+  minimax:['#4285F4','#000000','#FFFFFF','#E4E4E7'],
+  bmw:['#0066B1','#000000','#FFFFFF','#4C4C4C'],
+  ferrari:['#FF2800','#000000','#FFFFFF','#DBDBDB'],
+  lamborghini:['#FFD700','#000000','#FFFFFF','#2F2F2F'],
+  renault:['#FFCC33','#000000','#FFFFFF','#5E5E5E'],
+  kraken:['#5941A9','#000000','#FFFFFF','#B4B4B4'],
+  wise:['#9FE870','#0E0F0C','#FFFFFF','#474847'],
+  revolut:['#000000','#FFFFFF','#191C1F','#8A8A8A'],
+  uber:['#000000','#FFFFFF','#276EF1','#737373'],
+  spacex:['#005288','#000000','#FFFFFF','#A7A9AC'],
+  pinterest:['#E60023','#FFFFFF','#000000','#767676'],
+  intercom:['#1F8DED','#0C1C29','#FFFFFF','#738694'],
+  hashicorp:['#000000','#FFFFFF','#1563FF','#515151'],
+  mongodb:['#00684A','#001E2B','#FFFFFF','#889397'],
+  clickhouse:['#FFCC00','#000000','#FFFFFF','#8A8AA6'],
+  nvidia:['#76B900','#000000','#FFFFFF','#9F9F9F'],
+  ibm:['#054ADA','#000000','#FFFFFF','#525252'],
+  sanity:['#F03E2F','#101112','#FFFFFF','#A0A0A0'],
+  webflow:['#4353FF','#080E1C','#FFFFFF','#ABB5C4'],
+  airtable:['#FFBF00','#18BFFF','#F82B60','#000000'],
+  miro:['#FFD02F','#050038','#FFFFFF','#4262FF'],
+  clay:['#C3FF9A','#0A0A0A','#FFFFFF','#8B8B8B'],
+  composio:['#6366F1','#000000','#FFFFFF','#A0A0A0'],
+  cal:['#292929','#FFFFFF','#007EE5','#ACACAC'],
+  'opencode.ai':['#000000','#FFFFFF','#FF6B35','#737373'],
+  mintlify:['#0D9373','#000000','#FFFFFF','#6B7280'],
+  voltagent:['#7C3AED','#000000','#FFFFFF','#A3A3A3'],
+  warp:['#01A7B6','#021E1F','#FFFFFF','#5F6E7E'],
+  zapier:['#FF4A00','#201534','#FFFFFF','#706E84'],
+  superhuman:['#4B49B6','#FFFFFF','#F5F5F5','#8C8C8C'],
+  semrush:['#FF642D','#262626','#FFFFFF','#8C8C8C']
+};
+
 function showView(v){
-  document.querySelectorAll('.tab').forEach(t=>t.classList.toggle('active',t.dataset.view===v));
-  document.getElementById('galleryView').classList.toggle('active',v==='gallery');
-  document.getElementById('editorView').classList.toggle('active',v==='editor');
+  document.querySelectorAll('.view').forEach(el=>el.classList.toggle('active',el.id===v+'View'));
+  document.querySelectorAll('.nav-link').forEach(el=>el.classList.toggle('active',el.dataset.view===v));
 }
 
-// ─── Gallery ──────────────────────────────────────
 async function loadTemplates(){
-  try{const r=await fetch('/api/templates');allTemplates=await r.json();renderGallery()}catch{document.getElementById('galleryGrid').innerHTML='<p style="color:var(--muted);padding:20px">加载失败</p>'}
+  try{
+    const r=await fetch('/api/templates');
+    allTemplates=await r.json();
+    renderGallery();
+  }catch(e){
+    document.getElementById('galGrid').innerHTML='<p style="color:var(--muted)">加载失败</p>';
+  }
 }
+
+function getIconSvg(name){
+  const icons={
+    'sparkles':'<path d="m12 3-1.9 5.8a2 2 0 0 1-1.3 1.3L3 12l5.8 1.9a2 2 0 0 1 1.3 1.3L12 21l1.9-5.8a2 2 0 0 1 1.3-1.3L21 12l-5.8-1.9a2 2 0 0 1-1.3-1.3L12 3Z"/>',
+    'cpu':'<rect x="4" y="4" width="16" height="16" rx="2"/><rect x="9" y="9" width="6" height="6"/>',
+    'code':'<polyline points="16 18 22 12 16 6"/><polyline points="8 6 2 12 8 18"/>',
+    'palette':'<circle cx="13.5" cy="6.5" r="2.5"/><circle cx="17.5" cy="15.5" r="2.5"/><circle cx="8.5" cy="15.5" r="2.5"/><path d="M12 2C6.5 2 2 6.5 2 12s4.5 10 10 10 10-4.5 10-10S17.5 2 12 2"/>',
+    'credit-card':'<rect width="20" height="14" x="2" y="5" rx="2"/><line x1="2" y1="10" x2="22" y2="10"/>',
+    'shopping-bag':'<path d="M6 2 3 6v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V6l-3-4Z"/><line x1="3" y1="6" x2="21" y2="6"/><path d="M16 10a4 4 0 0 1-8 0"/>',
+    'car':'<path d="M19 17h2c.6 0 1-.4 1-1v-3c0-.9-.7-1.7-1.5-1.9L16 10l-3.3-5.7c-.3-.6-.9-1-1.6-1H4.5c-.6 0-1.2.3-1.5.9L1 8l4 2 2-5h6l3 5-4 1v2l-2 1"/><circle cx="7" cy="17" r="2"/>',
+    'server':'<rect x="2" y="2" width="20" height="8" rx="2"/><rect x="2" y="14" width="20" height="8" rx="2"/>',
+    'zap':'<polygon points="13,2 3,14 12,14 11,22 21,10 12,10"/>',
+    'building-2':'<path d="M6 22V4a2 2 0 0 1 2-2h8a2 2 0 0 1 2 2v18Z"/>',
+    'folder':'<path d="M4 20h16a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2h-7.93a2 2 0 0 1-1.66-.9l-.82-1.2A2 2 0 0 0 7.93 3H4a2 2 0 0 0-2 2v13c0 1.1.9 2 2 2Z"/>'
+  };
+  return icons[name]||icons.folder;
+}
+
 function renderGallery(){
   const cats=['全部',...new Set(allTemplates.map(t=>CATEGORY_ZH[t.category]||t.category))].sort((a,b)=>a==='全部'?-1:a.localeCompare(b));
-  document.getElementById('galleryFilters').innerHTML=cats.map(c=>`<div class="chip ${c===currentFilter?'active':''}" onclick="filterGallery('${c}')">${c}</div>`).join('');
+  const counts={'全部':allTemplates.length};
+  allTemplates.forEach(t=>{const c=CATEGORY_ZH[t.category]||t.category;counts[c]=(counts[c]||0)+1});
+  document.getElementById('galCats').innerHTML=cats.map(c=>{
+    const icon=CATEGORY_ICONS[c]||'folder';
+    return `<div class="gal-cat ${c===currentFilter?'active':''}" onclick="filterGallery('${c}')"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">${getIconSvg(icon)}</svg><span>${c}</span><span class="gal-cat-count">${counts[c]||0}</span></div>`;
+  }).join('');
+
   const filtered=currentFilter==='全部'?allTemplates:allTemplates.filter(t=>(CATEGORY_ZH[t.category]||t.category)===currentFilter);
-  document.getElementById('galleryGrid').innerHTML=filtered.map(t=>`<div class="tpl-card" onclick="loadTemplate('${t.id}')"><div class="tpl-cat">${CATEGORY_ZH[t.category]||t.category}</div><div class="tpl-name">${t.name}</div><div class="tpl-desc">${t.desc}</div></div>`).join('');
+  document.getElementById('galGrid').innerHTML=filtered.map(t=>{
+    const sw=TPL_SWATCHES[t.id]||['#7C5CFC','#222','#fff','#888'];
+    const swatchHtml=sw.map(c=>`<div class="tpl-card-swatch ${isColorLight(c)?'light':''}" style="background:${c}"></div>`).join('');
+    return `<div class="tpl-card" onclick="loadTemplate('${t.id}')"><div class="tpl-card-head"><span class="tpl-card-cat">${CATEGORY_ZH[t.category]||t.category}</span></div><div class="tpl-card-swatches">${swatchHtml}</div><div class="tpl-card-name">${t.name}</div><div class="tpl-card-desc">${t.desc}</div></div>`;
+  }).join('');
 }
+
 function filterGallery(c){currentFilter=c;renderGallery()}
 
 async function loadTemplate(id){
   showToast('加载中...');
   try{
-    const r=await fetch('/api/templates/'+encodeURIComponent(id));if(!r.ok)throw new Error((await r.json()).error);
+    const r=await fetch('/api/templates/'+encodeURIComponent(id));
+    if(!r.ok)throw new Error((await r.json()).error||'加载失败');
     const{content}=await r.json();
     document.getElementById('rawMd').value=content;
-    currentName=allTemplates.find(t=>t.id===id)?.name||id;
-    document.getElementById('bcName').textContent=currentName;
+    const tpl=allTemplates.find(t=>t.id===id);
+    document.getElementById('bcName').textContent=tpl?.name||id;
+    const sw=TPL_SWATCHES[id]||['#7C5CFC'];
+    document.getElementById('bcDot').style.background=sw[0];
     currentDesign=parseDesignMd(content);
-    renderEditor();showView('editor');showToast(currentName+' 已加载');
+    renderEditor();
+    showView('editor');
+    showToast((tpl?.name||id)+' 已加载');
   }catch(e){showToast('错误: '+e.message)}
 }
 
-// ─── Extract ──────────────────────────────────────
-async function extractDesign(){
-  const url=document.getElementById('urlInput').value.trim();if(!url)return;
-  const btn=document.getElementById('extractBtn');btn.disabled=true;btn.classList.add('loading');
-  try{
-    const r=await fetch('/api/extract',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({url})});
-    if(!r.ok)throw new Error((await r.json()).error);
-    const data=await r.json();const md=generateStitchMd(data,url);
-    document.getElementById('rawMd').value=md;
-    currentName=new URL(url).hostname.replace('www.','');
-    document.getElementById('bcName').textContent=currentName;
-    currentDesign=parseDesignMd(md);renderEditor();showView('editor');showToast('提取成功！');
-  }catch(e){showToast('错误: '+e.message)}
-  finally{btn.disabled=false;btn.classList.remove('loading')}
-}
-
-// ─── Parse DESIGN.md into structured data ─────────
 function parseDesignMd(md){
   const sections=[];let cur=null;
   for(const line of md.split('\n')){
@@ -245,151 +485,119 @@ function parseDesignMd(md){
     cur.lines.push(line);
     const boldItem=line.match(/^-\s+\*\*(.+?)\*\*\s*\(`([^`]+)`\):\s*(.*)/);
     if(boldItem)cur.items.push({name:boldItem[1],value:boldItem[2],desc:boldItem[3]});
-    const simpleItem=line.match(/^-\s+(.+?):\s*`?([^`\n]+)`?\s*$/);
+    const simpleItem=line.match(/^-\s+(.+?):\s*`?([^`\n]+?)`?\s*$/);
     if(simpleItem&&!boldItem)cur.items.push({name:simpleItem[1].replace(/\*\*/g,''),value:simpleItem[2]});
     const tableRow=line.match(/^\|(.+)\|$/);
     if(tableRow&&!line.includes('---'))cur.tables.push(tableRow[1].split('|').map(c=>c.trim()));
     if(line.startsWith('- ')&&cur.num===7){
       const lastH3=cur.lines.filter(l=>l.startsWith('### ')).pop()||'';
-      if(lastH3.includes("Don't")||lastH3.includes("don't")||lastH3.includes('避免'))cur.donts.push(line.slice(2));
-      else if(lastH3.includes('Do ')||lastH3==='### Do'||lastH3.includes('推荐'))cur.dos.push(line.slice(2));
+      if(lastH3.includes("Don't")||lastH3.includes("don't")||lastH3.includes('避免'))cur.donts.push(line.slice(2).replace(/^\*\*/,'').replace(/\*\*/g,''));
+      else if(lastH3.includes('Do ')||lastH3==='### Do'||lastH3.includes('推荐'))cur.dos.push(line.slice(2).replace(/^\*\*/,'').replace(/\*\*/g,''));
     }
   }
   if(cur)sections.push(cur);return sections;
 }
 
-// ─── Render visual editor ─────────────────────────
-const SEC_META=[
-  {num:1,zh:'视觉主题',color:'#7C5CFC'},
-  {num:2,zh:'调色板',color:'#5CAAFC'},
-  {num:3,zh:'字体排版',color:'#22c55e'},
-  {num:4,zh:'组件样式',color:'#f59e0b'},
-  {num:5,zh:'布局与间距',color:'#f97316'},
-  {num:6,zh:'层深与阴影',color:'#06b6d4'},
-  {num:7,zh:'规范指南',color:'#10b981'},
-  {num:8,zh:'响应式适配',color:'#a855f7'},
-  {num:9,zh:'AI 提示指南',color:'#ec4899'}
-];
+const SEC_META={
+  1:{zh:'视觉主题',color:'#a78bfa'},
+  2:{zh:'调色板',color:'#5CAAFC'},
+  3:{zh:'字体排版',color:'#22c55e'},
+  4:{zh:'组件样式',color:'#f59e0b'},
+  5:{zh:'间距与圆角',color:'#f97316'},
+  6:{zh:'层深与阴影',color:'#06b6d4'},
+  7:{zh:'规范指南',color:'#10b981'},
+  8:{zh:'响应式适配',color:'#a855f7'},
+  9:{zh:'AI 提示指南',color:'#ec4899'}
+};
 
 function renderEditor(){
-  if(!currentDesign||!currentDesign.length)return;
-  const left=document.getElementById('colLeft');
-  const right=document.getElementById('colRight');
-  left.innerHTML='';right.innerHTML='';
-  const leftNums=[1,2,5,7,9],rightNums=[3,4,6,8];
+  const inner=document.getElementById('canvasInner');
+  if(!currentDesign||!currentDesign.length){
+    inner.innerHTML='<div class="empty-state"><p>暂无数据</p></div>';
+    return;
+  }
+  inner.innerHTML='';
   for(const sec of currentDesign){
-    const meta=SEC_META.find(m=>m.num===sec.num)||{zh:'段落 '+sec.num,color:'#888'};
-    const html=renderSection(sec,meta);
-    if(leftNums.includes(sec.num))left.innerHTML+=html;
-    else right.innerHTML+=html;
+    const meta=SEC_META[sec.num];
+    if(!meta)continue;
+    const card=document.createElement('div');
+    card.className='sec-card';
+    card.dataset.sec=sec.num;
+    card.innerHTML=`<div class="sec-header"><div class="sec-dot" style="background:${meta.color}"></div><div class="sec-title">${meta.zh}</div><div class="sec-header-spacer"></div><div class="sec-edit"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 3a2.85 2.83 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z"/></svg></div></div>${renderSectionContent(sec)}`;
+    inner.appendChild(card);
   }
 }
 
-function renderSection(sec,meta){
-  let inner='';
+function renderSectionContent(sec){
   switch(sec.num){
-    case 1:inner=renderTheme(sec);break;
-    case 2:inner=renderColors(sec);break;
-    case 3:inner=renderTypo(sec);break;
-    case 4:inner=renderComponents(sec);break;
-    case 5:inner=renderLayout(sec);break;
-    case 6:inner=renderDepth(sec);break;
-    case 7:inner=renderDosDonts(sec);break;
-    case 8:inner=renderResponsive(sec);break;
-    case 9:inner=renderAgentGuide(sec);break;
-    default:inner=`<div class="sec-desc">${sec.lines.filter(l=>l.length>10).slice(0,3).join('<br>')}</div>`;
+    case 1:return renderTheme(sec);
+    case 2:return renderColors(sec);
+    case 3:return renderTypo(sec);
+    case 4:return renderComponents(sec);
+    case 5:return renderLayout(sec);
+    case 6:return renderDepth(sec);
+    case 7:return renderDosDonts(sec);
+    case 8:return renderResponsive(sec);
+    case 9:return renderAgentGuide(sec);
+    default:return '';
   }
-  return `<div class="sec-card"><div class="sec-header"><div class="sec-dot" style="background:${meta.color}"></div><div class="sec-title">${meta.zh}</div></div>${inner}</div>`;
 }
 
 function renderTheme(sec){
-  const desc=sec.lines.filter(l=>l.length>20&&!l.startsWith('-')&&!l.startsWith('**')&&!l.startsWith('#')).slice(0,2).join(' ').substring(0,200);
-  const chars=sec.lines.filter(l=>l.startsWith('- ')).slice(0,5);
-  let tags='';
-  const kwRegex=/dark|light|minimal|premium|fintech|bold|clean|geometric|luxury/gi;
-  const kws=[...new Set((desc.match(kwRegex)||[]).map(k=>k.toLowerCase()))].slice(0,3);
-  if(kws.length)tags=`<div class="sec-tags">${kws.map(k=>`<span class="sec-tag">${k}</span>`).join('')}</div>`;
-  let charHtml=chars.length?'<div style="margin-top:4px;display:flex;flex-direction:column;gap:3px">'+chars.map(c=>{
-    const m=c.match(/^-\s+(.+)/);return m?`<div style="font-size:11px;color:var(--text3)"><span style="color:var(--primary)">·</span> ${m[1].substring(0,80)}</div>`:'';
-  }).join('')+'</div>':'';
-  return `<div class="sec-desc">${desc||'暂无描述'}</div>${tags}${charHtml}`;
+  const desc=sec.lines.filter(l=>l.length>20&&!l.startsWith('-')&&!l.startsWith('**')&&!l.startsWith('#')).slice(0,1).join(' ').substring(0,180);
+  const kws=[...new Set((desc.match(/dark|light|minimal|premium|fintech|bold|clean|geometric|luxury|modern/gi)||[]).map(k=>k.toLowerCase()))].slice(0,3);
+  const tagsHtml=kws.length?`<div class="sec-tags">${kws.map(k=>`<span class="sec-tag">${k}</span>`).join('')}</div>`:'';
+  return `<div class="sec-desc">${desc||'暂无描述'}</div>${tagsHtml}`;
 }
 
 function renderColors(sec){
-  const colorItems=sec.items.filter(i=>i.value&&i.value.match(/#[0-9a-fA-F]{3,8}/));
-  if(!colorItems.length)return '<div class="sec-desc">暂无颜色数据</div>';
-  const swatches=colorItems.slice(0,8).map(c=>{
-    const dark=isColorDark(c.value);
-    return `<div class="swatch-item"><div class="swatch-color ${dark?'dark':''}" style="background:${c.value}" title="${c.name}: ${c.value}"></div><div class="swatch-name">${c.name}</div><div class="swatch-hex">${c.value}</div></div>`;
-  }).join('');
-  return `<div class="swatch-header"><span></span><span class="swatch-add">+ 添加</span></div><div class="swatch-grid">${swatches}</div>`;
+  const colors=sec.items.filter(i=>i.value&&i.value.match(/^#[0-9a-fA-F]{3,8}/)).slice(0,5);
+  if(!colors.length)return '<div class="sec-desc">暂无颜色</div>';
+  return `<div class="swatch-header"><span></span><span class="swatch-add">+ 添加</span></div><div class="swatch-grid">${colors.map(c=>`<div class="swatch-item"><div class="swatch-color ${isColorLight(c.value)?'light':''}" style="background:${c.value}" title="${c.value}"></div><span class="swatch-name">${c.name}</span></div>`).join('')}</div>`;
 }
 
 function renderTypo(sec){
-  const fontItems=sec.items.filter(i=>['Primary','Secondary','Monospace','主字体','副字体','等宽'].some(k=>i.name.includes(k)));
-  const table=sec.tables.filter(r=>r.length>=4&&r[0]!=='Role'&&r[0]!=='角色');
-  let html='';
-  if(fontItems.length){
-    const sizes=[28,20,14];
-    html+=fontItems.slice(0,3).map((f,i)=>{
-      const ff=f.value.split(',')[0].trim();
-      return `<div class="typo-sample"><div style="font-family:'${ff}',var(--sans);font-size:${sizes[i]||14}px;font-weight:${i<2?300:400};color:var(--text);letter-spacing:${i===0?'-0.8px':i===1?'-0.4px':'normal'}">${i===0?'展示标题':i===1?'章节标题':'正文文字，轻盈且自信。'}</div><span class="typo-meta">${ff} · ${sizes[i]||14}px · 字重 ${i<2?300:400}</span></div>`;
-    }).join('');
-  }
-  if(table.length){
-    html+=`<div style="overflow-x:auto;margin-top:8px"><table style="width:100%;border-collapse:collapse;font-size:11px"><thead><tr>${table[0].map(h=>`<th style="text-align:left;padding:4px 6px;color:var(--muted);border-bottom:1px solid var(--border);font-weight:500">${h}</th>`).join('')}</tr></thead><tbody>${table.slice(1).map(r=>`<tr>${r.map(c=>`<td style="padding:4px 6px;border-bottom:1px solid var(--border);color:var(--text2)">${c}</td>`).join('')}</tr>`).join('')}</tbody></table></div>`;
-  }
-  return html||'<div class="sec-desc">暂无字体数据</div>';
+  const fonts=sec.items.filter(i=>['Primary','Secondary','Monospace','主字体','副字体','等宽'].some(k=>i.name.includes(k)));
+  const primary=(fonts[0]?.value||'Inter').split(',')[0].trim().replace(/`/g,'');
+  return `<div class="typo-sample"><div style="font-family:'${primary}',sans-serif;font-size:26px;font-weight:300;color:var(--text);letter-spacing:-0.6px">展示标题</div><span class="typo-meta">${primary} · 56px · weight 300</span></div><div class="typo-sample"><div style="font-family:'${primary}',sans-serif;font-size:18px;font-weight:300;color:var(--text2)">章节标题</div><span class="typo-meta">${primary} · 32px · weight 300</span></div><div class="typo-sample"><div style="font-family:'${primary}',sans-serif;font-size:13px;font-weight:300;color:var(--text3)">正文，轻盈且自信。</div><span class="typo-meta">${primary} · 16px</span></div>`;
 }
 
 function renderComponents(sec){
-  const subsections=[];let cur=null;
+  const subs=[];let cur=null;
   sec.lines.forEach(l=>{
     const h3=l.match(/^###\s+(.+)/);
-    if(h3){if(cur)subsections.push(cur);cur={name:h3[1],props:[]};return}
+    if(h3){if(cur)subs.push(cur);cur={name:h3[1],props:[]};return}
     if(cur){const p=l.match(/^-\s+(.+?):\s*(.+)/);if(p)cur.props.push({k:p[1].replace(/\*\*/g,''),v:p[2]})}
   });
-  if(cur)subsections.push(cur);
-  if(!subsections.length)return '<div class="sec-desc">暂无组件数据</div>';
-
-  // Try to render actual button previews
-  const btnSec=subsections.find(s=>s.name.match(/button|按钮/i));
-  let btnHtml='';
+  if(cur)subs.push(cur);
+  const btnSec=subs.find(s=>s.name.match(/button|按钮/i));
+  let html='';
   if(btnSec){
-    const bg=btnSec.props.find(p=>p.k.match(/background|背景/i))?.v?.match(/#[0-9a-fA-F]+/)?.[0]||'#533afd';
-    const radius=btnSec.props.find(p=>p.k.match(/radius|圆角/i))?.v||'4px';
-    btnHtml=`<div class="comp-btns"><div class="comp-btn-primary" style="background:${bg};color:#fff;border-radius:${radius}">立即开始</div><div class="comp-btn-ghost" style="border:1px solid ${bg};color:${bg};border-radius:${radius}">联系销售</div></div>`;
+    const bg=btnSec.props.find(p=>p.k.match(/background|背景/i))?.v?.match(/#[0-9a-fA-F]+/)?.[0]||'#7C5CFC';
+    const radius=(btnSec.props.find(p=>p.k.match(/radius|圆角/i))?.v||'4px').replace(/`/g,'');
+    html+=`<div class="comp-btns"><div class="comp-btn-primary" style="background:${bg};border-radius:${radius}">立即开始</div><div class="comp-btn-ghost" style="border:1px solid ${bg};color:${bg};border-radius:${radius}">联系销售</div></div>`;
   }
-
-  let cards=subsections.filter(s=>s!==btnSec).slice(0,2).map(s=>{
-    const props=s.props.slice(0,3).map(p=>`<div style="font-size:10px;color:var(--text3)">${p.k}: <code style="font-size:9px;background:var(--bg);padding:1px 3px;border-radius:2px">${p.v}</code></div>`).join('');
-    return `<div class="comp-card-preview"><div class="comp-card-title">${s.name}</div>${props}</div>`;
-  }).join('');
-
-  return btnHtml+cards;
+  const cardSec=subs.find(s=>s.name.match(/card|卡片|container/i));
+  if(cardSec){
+    html+=`<div class="comp-card-preview"><div class="ct">功能卡片</div><div class="cd">${cardSec.props.slice(0,2).map(p=>p.v.substring(0,30)).join(' · ')}</div></div>`;
+  }
+  return html||'<div class="sec-desc">暂无组件</div>';
 }
 
 function renderLayout(sec){
-  // Spacing
-  const spacingItems=sec.items.filter(i=>i.value&&i.value.match(/\d+px/));
-  const radiusItems=sec.items.filter(i=>i.name.match(/micro|standard|comfortable|relaxed|large|xl|pill|level|标准|舒适|小|大/i));
   let html='';
-  const scaleMatch=sec.lines.find(l=>l.match(/scale|刻度/i));
-  const baseMatch=sec.lines.find(l=>l.match(/base|基础/i));
-  if(baseMatch)html+=`<div style="font-size:11px;color:var(--text3);margin-bottom:8px">${baseMatch.replace(/^-\s+/,'')}</div>`;
-
-  if(spacingItems.length||scaleMatch){
-    const vals=[];
-    if(scaleMatch){const nums=scaleMatch.match(/\d+/g);if(nums)nums.forEach(n=>vals.push(parseInt(n)))}
-    if(!vals.length)spacingItems.forEach(s=>{const n=parseInt(s.value);if(n>0&&n<=64)vals.push(n)});
-    if(vals.length){
-      html+=`<div class="spacing-row">${vals.filter(v=>v<=48).slice(0,6).map(v=>`<div class="spacing-item"><div class="spacing-box" style="width:${v}px;height:${v}px"></div><span class="spacing-label">${v}</span></div>`).join('')}</div>`;
-    }
+  const scaleLine=sec.lines.find(l=>l.match(/scale|刻度/i));
+  const baseLine=sec.lines.find(l=>l.match(/base unit|基础单位/i));
+  if(baseLine){
+    html+=`<div style="font-size:11px;color:var(--text3)">${baseLine.replace(/^-\s+/,'').replace(/\*\*/g,'')}</div>`;
   }
-
-  if(radiusItems.length){
-    html+=`<div style="font-size:11px;font-weight:500;color:var(--text3);margin-top:12px;margin-bottom:6px">圆角</div>`;
-    html+=`<div class="radius-row">${radiusItems.slice(0,5).map(r=>`<div class="radius-item"><div class="radius-box" style="border-radius:${r.value}"></div><span class="radius-label">${r.value}</span></div>`).join('')}</div>`;
+  const vals=[];
+  if(scaleLine){
+    const nums=scaleLine.match(/\d+/g);
+    if(nums)nums.forEach(n=>{const v=parseInt(n);if(v>=4&&v<=48)vals.push(v)});
+  }
+  if(vals.length){
+    html+=`<div class="spacing-row">${[...new Set(vals)].sort((a,b)=>a-b).slice(0,5).map(v=>`<div class="sp-item"><div class="sp-box" style="width:${v}px;height:${v}px"></div><span class="sp-label">${v}</span></div>`).join('')}</div>`;
   }
   return html||'<div class="sec-desc">暂无布局数据</div>';
 }
@@ -399,140 +607,132 @@ function renderDepth(sec){
   if(table.length){
     return `<div class="depth-row">${table.slice(0,4).map(r=>{
       const shadow=r[1]?.match(/`([^`]+)`/)?.[1]||'';
-      return `<div class="depth-item"><div class="depth-box" style="${shadow?'box-shadow:'+shadow:''}"></div><span class="depth-label">${(r[0]||'').substring(0,8)}</span></div>`;
+      return `<div class="depth-item"><div class="depth-box" style="${shadow?'box-shadow:'+shadow:''}"></div><span class="depth-label">${(r[0]||'').substring(0,6)}</span></div>`;
     }).join('')}</div>`;
   }
-  // Fallback: render 4 levels
-  return `<div class="depth-row">
-    <div class="depth-item"><div class="depth-box"></div><span class="depth-label">无阴影</span></div>
-    <div class="depth-item"><div class="depth-box" style="box-shadow:0 3px 6px rgba(23,23,23,0.15)"></div><span class="depth-label">微弱</span></div>
-    <div class="depth-item"><div class="depth-box" style="box-shadow:0 8px 20px rgba(50,50,93,0.25)"></div><span class="depth-label">标准</span></div>
-    <div class="depth-item"><div class="depth-box" style="box-shadow:0 14px 35px rgba(50,50,93,0.35)"></div><span class="depth-label">悬浮</span></div>
-  </div>`;
+  return `<div class="depth-row"><div class="depth-item"><div class="depth-box"></div><span class="depth-label">无</span></div><div class="depth-item"><div class="depth-box" style="box-shadow:0 3px 6px rgba(23,23,23,0.5)"></div><span class="depth-label">微弱</span></div><div class="depth-item"><div class="depth-box" style="box-shadow:0 8px 20px rgba(50,50,93,0.4)"></div><span class="depth-label">标准</span></div><div class="depth-item"><div class="depth-box" style="box-shadow:0 14px 35px rgba(50,50,93,0.5)"></div><span class="depth-label">悬浮</span></div></div>`;
 }
 
 function renderDosDonts(sec){
-  if(!sec.dos.length&&!sec.donts.length)return '<div class="sec-desc">暂无规范数据</div>';
-  return `<div class="dd-row">
-    <div class="dd-box dd-do"><div class="dd-title" style="color:#22c55e">✓ 推荐</div>${sec.dos.map(d=>`<div>· ${d}</div>`).join('')}</div>
-    <div class="dd-box dd-dont"><div class="dd-title" style="color:#ef4444">✗ 避免</div>${sec.donts.map(d=>`<div>· ${d}</div>`).join('')}</div>
-  </div>`;
+  const dos=sec.dos.slice(0,3);const donts=sec.donts.slice(0,3);
+  if(!dos.length&&!donts.length)return '<div class="sec-desc">暂无规范</div>';
+  return `<div class="dd-wrap">${dos.length?`<div class="dd-box dd-do"><div class="dd-title">✓ 推荐</div>${dos.map(d=>`<div>· ${d.substring(0,50)}</div>`).join('')}</div>`:''}${donts.length?`<div class="dd-box dd-dont"><div class="dd-title">✗ 避免</div>${donts.map(d=>`<div>· ${d.substring(0,50)}</div>`).join('')}</div>`:''}</div>`;
 }
 
 function renderResponsive(sec){
   const table=sec.tables.filter(r=>r.length>=3&&!r[0].match(/name|名称/i));
-  const icons={Mobile:'smartphone',Tablet:'tablet',Desktop:'monitor','Large Desktop':'monitor'};
-  const zhNames={Mobile:'移动端',Tablet:'平板',Desktop:'桌面端','Large Desktop':'大屏'};
+  const zhNames={'Mobile':'移动','Tablet':'平板','Desktop':'桌面','Large Desktop':'大屏'};
   if(table.length){
     return `<div class="resp-row">${table.slice(0,3).map(r=>{
-      const icon=icons[r[0]]||'monitor';const zh=zhNames[r[0]]||r[0];
-      return `<div class="resp-item"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><use href="#icon-${icon}"/></svg><div class="resp-name">${zh}</div><div class="resp-size">${r[1]}</div></div>`;
+      const zh=zhNames[r[0]]||r[0];
+      return `<div class="resp-item"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="5" y="2" width="14" height="20" rx="2"/></svg><div class="resp-name">${zh}</div><div class="resp-size">${r[1]}</div></div>`;
     }).join('')}</div>`;
   }
-  return `<div class="resp-row">
-    <div class="resp-item"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="5" y="2" width="14" height="20" rx="2"/><line x1="12" y1="18" x2="12" y2="18"/></svg><div class="resp-name">移动端</div><div class="resp-size">&lt;640px</div></div>
-    <div class="resp-item"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="4" y="3" width="16" height="18" rx="2"/><line x1="12" y1="17" x2="12" y2="17"/></svg><div class="resp-name">平板</div><div class="resp-size">640-1024px</div></div>
-    <div class="resp-item"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="2" y="3" width="20" height="14" rx="2"/><line x1="8" y1="21" x2="16" y2="21"/><line x1="12" y1="17" x2="12" y2="21"/></svg><div class="resp-name">桌面端</div><div class="resp-size">&gt;1024px</div></div>
-  </div>`;
+  return `<div class="resp-row"><div class="resp-item"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="5" y="2" width="14" height="20" rx="2"/></svg><div class="resp-name">移动</div><div class="resp-size">&lt;640</div></div><div class="resp-item"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="4" y="3" width="16" height="18" rx="2"/></svg><div class="resp-name">平板</div><div class="resp-size">640-1024</div></div><div class="resp-item"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="2" y="3" width="20" height="14" rx="2"/></svg><div class="resp-name">桌面</div><div class="resp-size">&gt;1024</div></div></div>`;
 }
 
 function renderAgentGuide(sec){
-  const refs=sec.items.filter(i=>i.value&&i.value.match(/#[0-9a-fA-F]/));
-  const guides=sec.lines.filter(l=>l.match(/^\d+\.\s/));
+  const refs=sec.items.filter(i=>i.value&&i.value.match(/#[0-9a-fA-F]/)).slice(0,4);
+  const guides=sec.lines.filter(l=>l.match(/^\d+\.\s/)).slice(0,4);
   let html='';
   if(refs.length){
-    html+=`<div class="agent-refs">${refs.slice(0,6).map(r=>`<div><span style="color:var(--primary)">→</span> ${r.name}: <code style="font-size:10px;background:var(--bg);padding:1px 4px;border-radius:3px">${r.value}</code></div>`).join('')}</div>`;
+    html+=`<div class="agent-refs">${refs.map(r=>`<div><span style="color:var(--primary)">→</span> ${r.name}: <code>${r.value}</code></div>`).join('')}</div>`;
   }
   if(guides.length){
-    html+=`<div class="agent-code">${guides.slice(0,5).map(g=>`<div>${g}</div>`).join('')}</div>`;
+    html+=`<div class="agent-code">${guides.map(g=>`<div>${g}</div>`).join('')}</div>`;
   }
-  return html||'<div class="sec-desc">暂无提示指南</div>';
+  return html||'<div class="sec-desc">暂无指南</div>';
 }
 
-// ─── Generate Stitch MD from extracted data ───────
+function isColorLight(hex){
+  if(!hex||!hex.startsWith('#'))return false;
+  let h=hex.replace('#','');
+  if(h.length===3)h=h[0]+h[0]+h[1]+h[1]+h[2]+h[2];
+  const r=parseInt(h.substr(0,2),16),g=parseInt(h.substr(2,2),16),b=parseInt(h.substr(4,2),16);
+  return(r*299+g*587+b*114)/1000>200;
+}
+
+function handleGenerate(){
+  const val=document.getElementById('promptInput').value.trim();
+  if(!val){showToast('请输入内容');return}
+  if(val.match(/^https?:\/\//i)||val.match(/^[\w-]+\.[\w-]+/)){
+    const url=val.match(/^https?:\/\//i)?val:'https://'+val;
+    extractFromUrl(url);
+  }else{
+    showToast('请粘贴网址，或去模版库选择');
+    showView('gallery');
+  }
+}
+
+async function extractFromUrl(url){
+  const btn=document.getElementById('genBtn');
+  btn.disabled=true;btn.classList.add('loading');
+  try{
+    const r=await fetch('/api/extract',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({url})});
+    if(!r.ok)throw new Error((await r.json()).error);
+    const data=await r.json();
+    const md=generateStitchMd(data,url);
+    document.getElementById('rawMd').value=md;
+    const host=new URL(url).hostname.replace('www.','');
+    document.getElementById('bcName').textContent=host;
+    document.getElementById('bcDot').style.background=data.colors[0]?.value||'#7C5CFC';
+    currentDesign=parseDesignMd(md);
+    renderEditor();
+    showView('editor');
+    showToast('提取成功！');
+  }catch(e){showToast('错误: '+e.message)}
+  finally{btn.disabled=false;btn.classList.remove('loading')}
+}
+
 function generateStitchMd(data,url){
   const host=new URL(url).hostname.replace('www.','');
   const pf=data.fonts[0]?.name||'System';
   const L=[];
   L.push(`# Design System Inspiration of ${data.title||host}\n`);
   L.push(`## 1. Visual Theme & Atmosphere\n`);
-  L.push(`The visual identity of ${host} is built on a ${isColorDark(data.colors[0]?.value||'#fff')?'dark':'light'} foundation with ${pf} as the primary typeface.\n`);
-  L.push('**Key Characteristics:**');
-  data.colors.slice(0,3).forEach(c=>L.push(`- Key color: \`${c.value}\``));
-  data.fonts.slice(0,2).forEach(f=>L.push(`- Font: ${f.name}`));
-  L.push('');
-  L.push('## 2. Color Palette & Roles\n');
-  L.push('### Primary');
+  L.push(`The visual identity of ${host} is built on a ${isColorLight(data.colors[0]?.value||'#fff')?'light':'dark'} foundation with ${pf} as the primary typeface.\n`);
+  L.push(`## 2. Color Palette & Roles\n\n### Primary`);
   const roles=['Background','Surface','Text Primary','Text Secondary','Primary','Secondary','Accent','Border'];
   data.colors.slice(0,8).forEach((c,i)=>L.push(`- **${roles[i]||'Color-'+(i+1)}** (\`${c.value}\`): Interface color`));
-  L.push('');
-  L.push('## 3. Typography Rules\n');
-  L.push('### Font Family');
+  L.push(`\n## 3. Typography Rules\n\n### Font Family`);
   data.fonts.forEach((f,i)=>L.push(`- **${i===0?'Primary':i===1?'Secondary':'Monospace'}**: ${f.name}`));
-  L.push('\n### Hierarchy\n');
-  L.push('| Role | Font | Size | Weight | Notes |');L.push('|------|------|------|--------|-------|');
-  const typoR=['Display Hero','Display Large','Section Heading','Sub-heading','Body Large','Body','Button','Caption','Micro'];
-  data.fontSizes.sort((a,b)=>b-a).slice(0,9).forEach((s,i)=>L.push(`| ${typoR[i]||'Level'} | ${pf} | ${s}px | ${i<3?'600':'400'} | — |`));
-  L.push('');
-  L.push('## 4. Component Stylings\n');
-  L.push('### Buttons');
+  L.push(`\n## 4. Component Stylings\n\n### Buttons`);
   L.push(`- Background: \`${data.colors[4]?.value||'#333'}\``);
-  L.push(`- Text: \`#ffffff\``);
   L.push(`- Radius: ${data.borderRadii[0]||'4px'}`);
-  L.push('\n### Cards & Containers');
-  L.push(`- Background: \`${data.colors[1]?.value||'#fff'}\``);
-  L.push(`- Border: 1px solid \`${data.colors[7]?.value||'#e5e5e5'}\``);
-  L.push(`- Radius: ${data.borderRadii[1]||'8px'}`);
-  if(data.shadows[0])L.push(`- Shadow: \`${data.shadows[0]}\``);
-  L.push('');
-  L.push('## 5. Layout Principles\n');
-  L.push('### Spacing System');
+  L.push(`\n## 5. Layout Principles\n\n### Spacing System`);
   L.push(`- Base unit: ${data.spacings[1]||8}px`);
   L.push(`- Scale: ${data.spacings.join('px, ')}px`);
-  L.push('\n### Border Radius Scale');
-  const rNames=['Micro','Standard','Comfortable','Relaxed','Large','XL'];
-  data.borderRadii.forEach((r,i)=>L.push(`- ${rNames[i]||'Level-'+(i+1)}: ${r}`));
-  L.push('');
-  L.push('## 6. Depth & Elevation\n');
-  L.push('| Level | Treatment | Use |');L.push('|-------|-----------|-----|');
-  L.push('| Flat (Level 0) | No shadow | Background |');
-  data.shadows.slice(0,3).forEach((s,i)=>L.push(`| Level ${i+1} | \`${s.substring(0,60)}...\` | Elevated |`));
-  L.push('');
-  L.push("## 7. Do's and Don'ts\n");
-  L.push('### Do');
-  L.push(`- Use ${pf} consistently`);L.push(`- Keep border-radius within range`);L.push(`- Maintain color consistency`);
-  L.push("\n### Don't");
-  L.push("- Don't mix font families");L.push("- Don't use colors outside palette");L.push("- Don't override spacing scale");
-  L.push('');
-  L.push('## 8. Responsive Behavior\n');
-  L.push('### Breakpoints');
-  L.push('| Name | Width | Key Changes |');L.push('|------|-------|-------------|');
-  L.push('| Mobile | <640px | Single column |');L.push('| Tablet | 640-1024px | 2-column |');L.push('| Desktop | >1024px | Full layout |');
-  L.push('');
-  L.push('## 9. Agent Prompt Guide\n');
-  L.push('### Quick Color Reference');
-  data.colors.slice(0,6).forEach((c,i)=>L.push(`- ${roles[i]||'Color'}: \`${c.value}\``));
-  L.push('\n### Iteration Guide');
+  L.push(`\n## 6. Depth & Elevation\n\n| Level | Treatment | Use |`);
+  L.push(`|-------|-----------|-----|`);
+  L.push(`| Flat | No shadow | Background |`);
+  data.shadows.slice(0,3).forEach((s,i)=>L.push(`| Level ${i+1} | \`${s.substring(0,50)}\` | Elevated |`));
+  L.push(`\n## 7. Do's and Don'ts\n\n### Do`);
+  L.push(`- Use ${pf} consistently`);
+  L.push(`- Keep colors within palette`);
+  L.push(`\n### Don't`);
+  L.push(`- Don't mix font families`);
+  L.push(`- Don't use colors outside palette`);
+  L.push(`\n## 8. Responsive Behavior\n\n### Breakpoints\n| Name | Width | Key Changes |`);
+  L.push(`|------|-------|-------------|`);
+  L.push(`| Mobile | <640px | Single column |`);
+  L.push(`| Tablet | 640-1024px | 2-column |`);
+  L.push(`| Desktop | >1024px | Full layout |`);
+  L.push(`\n## 9. Agent Prompt Guide\n\n### Quick Color Reference`);
+  data.colors.slice(0,4).forEach((c,i)=>L.push(`- ${roles[i]}: \`${c.value}\``));
+  L.push(`\n### Iteration Guide`);
   L.push(`1. Use ${pf} for all text`);
   L.push(`2. Primary color: \`${data.colors[4]?.value||data.colors[0]?.value}\``);
-  L.push(`3. Background: \`${data.colors[0]?.value}\``);
-  L.push(`4. Border-radius: ${data.borderRadii[0]||'4px'} for buttons`);
-  L.push('');
   return L.join('\n');
 }
 
-// ─── Utils ────────────────────────────────────────
-function isColorDark(hex){
-  if(!hex||!hex.startsWith('#'))return false;
-  hex=hex.replace('#','');if(hex.length===3)hex=hex[0]+hex[0]+hex[1]+hex[1]+hex[2]+hex[2];
-  const r=parseInt(hex.substr(0,2),16),g=parseInt(hex.substr(2,2),16),b=parseInt(hex.substr(4,2),16);
-  return(r*299+g*587+b*114)/1000<50;
-}
+function pickFile(){showToast('截图功能开发中')}
+function focusUrl(){document.getElementById('promptInput').focus();document.getElementById('promptInput').placeholder='粘贴网址，例如: https://stripe.com'}
+function toggleMic(){showToast('语音功能开发中')}
 
-// ─── Command bar ──────────────────────────────────
-document.getElementById('commandInput').addEventListener('keydown',e=>{
-  if((e.metaKey||e.ctrlKey)&&e.key==='Enter'){executeCommand(e.target.value.trim());e.target.value=''}
+document.getElementById('chatInput').addEventListener('keydown',e=>{
+  if(e.key==='Enter'){executeCommand(e.target.value.trim());e.target.value=''}
 });
+
 function executeCommand(cmd){
   if(!cmd)return;
   let md=document.getElementById('rawMd').value;
@@ -541,29 +741,35 @@ function executeCommand(cmd){
     const[,name,color]=colorChange;const hex=namedToHex(color);
     const re1=new RegExp(`(\\*\\*${name}\\*\\*\\s*\\()\`[^)]+\`(\\))`,'i');
     const re2=new RegExp(`(- ${name}:)\\s*\`?#[0-9a-fA-F]{3,8}\`?`,'i');
-    if(re1.test(md)){md=md.replace(re1,`$1\`${hex}\`$2`)}
-    else if(re2.test(md)){md=md.replace(re2,`$1 \`${hex}\``)}
+    if(re1.test(md))md=md.replace(re1,`$1\`${hex}\`$2`);
+    else if(re2.test(md))md=md.replace(re2,`$1 \`${hex}\``);
     else{showToast('未找到: '+name);return}
-    document.getElementById('rawMd').value=md;currentDesign=parseDesignMd(md);renderEditor();showToast(`已更新 ${name} → ${hex}`);return;
+    document.getElementById('rawMd').value=md;
+    currentDesign=parseDesignMd(md);
+    renderEditor();
+    showToast(`已更新 ${name} → ${hex}`);
+    return;
   }
-  const addSec=cmd.match(/(?:加|添加|add)\s*(?:一个?)?\s*(.+)\s*(?:段落|section)/i);
-  if(addSec){md+=`\n\n## ${addSec[1].trim()}\n\n- item: value`;document.getElementById('rawMd').value=md;currentDesign=parseDesignMd(md);renderEditor();showToast('已添加段落');return}
-  const rename=cmd.match(/(?:rename|重命名|把)\s+(\S+)\s+(?:to|改为|改成)\s+(\S+)/i);
-  if(rename){const re=new RegExp(rename[1],'gi');if(re.test(md)){md=md.replace(re,rename[2]);document.getElementById('rawMd').value=md;currentDesign=parseDesignMd(md);renderEditor();showToast('已重命名');return}}
   showToast('试试: "把Primary改成#FF0000"');
 }
-function namedToHex(c){if(c.startsWith('#'))return c.toUpperCase();return{红:'#FF0000',蓝:'#0066FF',绿:'#00CC66',黑:'#000000',白:'#FFFFFF',橙:'#FF8800',紫:'#7C5CFC',粉:'#FF66AA',黄:'#FFCC00',青:'#00CCFF',灰:'#888888',深蓝:'#003366',浅蓝:'#66CCFF',red:'#FF0000',blue:'#0066FF',green:'#00CC66',black:'#000000',white:'#FFFFFF',purple:'#7C5CFC',orange:'#FF8800'}[c]||c}
 
-// ─── Copy/Download ────────────────────────────────
-function copyMd(){navigator.clipboard.writeText(document.getElementById('rawMd').value);showToast('已复制！')}
-function downloadMd(){const a=document.createElement('a');a.href=URL.createObjectURL(new Blob([document.getElementById('rawMd').value],{type:'text/markdown'}));a.download='DESIGN.md';a.click();showToast('已下载')}
-function showToast(m){const t=document.getElementById('toast');t.textContent=m;t.classList.add('show');setTimeout(()=>t.classList.remove('show'),2200)}
+function namedToHex(c){
+  if(c.startsWith('#'))return c.toUpperCase();
+  return{红:'#FF0000',蓝:'#0066FF',绿:'#00CC66',黑:'#000000',白:'#FFFFFF',橙:'#FF8800',紫:'#7C5CFC',粉:'#FF66AA',黄:'#FFCC00',青:'#00CCFF',灰:'#888888',深蓝:'#003366',浅蓝:'#66CCFF',red:'#FF0000',blue:'#0066FF',green:'#00CC66',black:'#000000',white:'#FFFFFF'}[c]||c;
+}
 
-// ─── URL enter ────────────────────────────────────
-document.getElementById('urlInput').addEventListener('keydown',e=>{if(e.key==='Enter')extractDesign()});
+function showToast(m){
+  const t=document.getElementById('toast');
+  t.textContent=m;
+  t.classList.add('show');
+  setTimeout(()=>t.classList.remove('show'),2200);
+}
 
-// ─── Init ─────────────────────────────────────────
 loadTemplates();
+
+document.getElementById('promptInput').addEventListener('keydown',e=>{
+  if(e.key==='Enter'&&!e.shiftKey){e.preventDefault();handleGenerate()}
+});
 </script>
 </body>
 </html>
