@@ -484,10 +484,34 @@ async function loadTemplate(id){
 }
 
 function parseDesignMd(md){
-  const sections=[];let cur=null;
+  const sections=[];let cur=null;let autoNum=0;
+  const TITLE_MAP=[
+    /visual theme|atmosphere|视觉主题|主题/i,
+    /color palette|调色|color/i,
+    /typography|字体|排版/i,
+    /component|组件/i,
+    /layout|spacing|布局|间距/i,
+    /depth|elevation|shadow|阴影|层深/i,
+    /do.?s|don.?ts|规范|指南/i,
+    /responsive|breakpoint|响应|适配/i,
+    /agent|prompt|提示/i
+  ];
   for(const line of md.split('\n')){
-    const h2=line.match(/^##\s+(\d+)\.\s+(.+)/);
-    if(h2){if(cur)sections.push(cur);cur={num:parseInt(h2[1]),title:h2[2].trim(),lines:[],items:[],tables:[],dos:[],donts:[]};continue}
+    const h2=line.match(/^##\s+(?:(\d+)[.\s]+)?(.+)/);
+    if(h2){
+      if(cur)sections.push(cur);
+      const title=h2[2].trim();
+      let num=h2[1]?parseInt(h2[1]):0;
+      if(!num){
+        // Infer by title keyword
+        for(let i=0;i<TITLE_MAP.length;i++){
+          if(TITLE_MAP[i].test(title)){num=i+1;break}
+        }
+        if(!num){autoNum++;num=autoNum}
+      }
+      cur={num,title,lines:[],items:[],tables:[],dos:[],donts:[]};
+      continue;
+    }
     if(!cur)continue;
     cur.lines.push(line);
     const boldItem=line.match(/^-\s+\*\*(.+?)\*\*\s*\(`([^`]+)`\):\s*(.*)/);
@@ -586,7 +610,7 @@ function renderComponents(sec){
   }
   const cardSec=subs.find(s=>s.name.match(/card|卡片|container/i));
   if(cardSec){
-    html+=`<div class="comp-card-preview"><div class="ct">功能卡片</div><div class="cd">${cardSec.props.slice(0,2).map(p=>p.v.substring(0,30)).join(' · ')}</div></div>`;
+    html+=`<div class="comp-card-preview"><div class="ct">功能卡片</div><div class="cd">${cardSec.props.slice(0,2).map(p=>p.v.replace(/\*\*/g,'').replace(/`/g,'').trim().substring(0,40)).join(' · ')}</div></div>`;
   }
   return html||'<div class="sec-desc">暂无组件</div>';
 }
@@ -621,9 +645,23 @@ function renderDepth(sec){
 }
 
 function renderDosDonts(sec){
-  const dos=sec.dos.slice(0,3);const donts=sec.donts.slice(0,3);
+  // Fallback: scan raw lines if dos/donts weren't captured by parser
+  let dos=sec.dos.slice(0,3),donts=sec.donts.slice(0,3);
+  if(!dos.length&&!donts.length){
+    let inDo=false,inDont=false;
+    for(const line of sec.lines){
+      if(line.match(/###\s+Do\b/i)||line.includes('推荐')){inDo=true;inDont=false;continue}
+      if(line.match(/###\s+Don'?t/i)||line.includes('避免')){inDo=false;inDont=true;continue}
+      const m=line.match(/^-\s+(.+)/);
+      if(m){
+        const text=m[1].replace(/\*\*/g,'').replace(/`/g,'').trim();
+        if(inDo&&dos.length<3)dos.push(text);
+        else if(inDont&&donts.length<3)donts.push(text);
+      }
+    }
+  }
   if(!dos.length&&!donts.length)return '<div class="sec-desc">暂无规范</div>';
-  return `<div class="dd-wrap">${dos.length?`<div class="dd-box dd-do"><div class="dd-title">✓ 推荐</div>${dos.map(d=>`<div>· ${d.substring(0,50)}</div>`).join('')}</div>`:''}${donts.length?`<div class="dd-box dd-dont"><div class="dd-title">✗ 避免</div>${donts.map(d=>`<div>· ${d.substring(0,50)}</div>`).join('')}</div>`:''}</div>`;
+  return `<div class="dd-wrap">${dos.length?`<div class="dd-box dd-do"><div class="dd-title">✓ 推荐</div>${dos.map(d=>`<div>· ${d.substring(0,60)}</div>`).join('')}</div>`:''}${donts.length?`<div class="dd-box dd-dont"><div class="dd-title">✗ 避免</div>${donts.map(d=>`<div>· ${d.substring(0,60)}</div>`).join('')}</div>`:''}</div>`;
 }
 
 function renderResponsive(sec){
