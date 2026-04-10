@@ -1,0 +1,569 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>DesignMD — 设计语言提取器</title>
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&family=Noto+Sans+SC:wght@300;400;500;600;700&display=swap');
+    *{margin:0;padding:0;box-sizing:border-box}
+    :root{
+      --bg:#0e0e12;--surface:#1a1a22;--surface2:#16161c;--surface3:#222230;
+      --border:#2a2a33;--border2:#333;--text:#e8e8e8;--text2:#ccc;--text3:#999;
+      --muted:#777;--muted2:#666;--muted3:#555;--primary:#7C5CFC;--primary-hover:#6B4AEE;
+      --primary-dim:rgba(124,92,252,0.12);--green:#22c55e;--red:#ef4444;--amber:#f59e0b;
+      --blue:#5CAAFC;--cyan:#06b6d4;--pink:#ec4899;--purple:#a855f7;--orange:#f97316;
+      --mono:'JetBrains Mono',monospace;--sans:'Inter','Noto Sans SC',-apple-system,sans-serif;
+      --radius:12px;
+    }
+    body{font-family:var(--sans);background:var(--bg);color:var(--text);height:100vh;display:flex;flex-direction:column;overflow:hidden}
+    ::-webkit-scrollbar{width:5px}::-webkit-scrollbar-track{background:transparent}::-webkit-scrollbar-thumb{background:var(--border);border-radius:3px}
+
+    /* Top Bar */
+    .top-bar{display:flex;align-items:center;gap:12px;padding:0 16px;height:52px;background:var(--surface2);border-bottom:1px solid var(--border);flex-shrink:0}
+    .logo{display:flex;align-items:center;gap:8px;flex-shrink:0;cursor:pointer}
+    .logo svg{color:var(--primary)}.logo span{font-size:15px;font-weight:600}
+    .sep{width:1px;height:20px;background:var(--border);flex-shrink:0}
+    .tab-bar{display:flex;gap:2px;flex-shrink:0}
+    .tab{padding:6px 12px;font-size:12px;font-weight:500;color:var(--muted);cursor:pointer;border-radius:6px;transition:all .15s;display:flex;align-items:center;gap:5px}
+    .tab:hover{color:var(--text3);background:var(--surface3)}.tab.active{color:var(--text);background:var(--primary-dim)}.tab.active svg{color:var(--primary)}
+    .url-bar{display:flex;align-items:center;gap:8px;flex:1;height:32px;background:var(--bg);border:1px solid var(--border);border-radius:8px;padding:0 10px;transition:border-color .2s}
+    .url-bar:focus-within{border-color:var(--primary)}.url-bar svg{color:var(--muted);flex-shrink:0}
+    .url-bar input{flex:1;background:none;border:none;color:var(--text);font-size:12px;font-family:var(--sans);outline:none}.url-bar input::placeholder{color:var(--muted3)}
+    .btn{display:flex;align-items:center;gap:5px;height:32px;padding:0 14px;background:var(--primary);color:#fff;border:none;border-radius:8px;font-size:12px;font-weight:500;font-family:var(--sans);cursor:pointer;transition:background .15s;flex-shrink:0}
+    .btn:hover{background:var(--primary-hover)}.btn:disabled{opacity:.4;cursor:not-allowed}.btn.loading svg{animation:spin .8s linear infinite}
+    .btn-secondary{background:var(--surface);border:1px solid var(--border);color:var(--text3)}.btn-secondary:hover{border-color:var(--muted)}
+    @keyframes spin{to{transform:rotate(360deg)}}
+
+    /* Main */
+    .main{display:flex;flex:1;overflow:hidden}
+
+    /* Gallery */
+    .gallery{display:none;flex-direction:column;width:100%;height:100%;overflow:hidden}.gallery.active{display:flex}
+    .gallery-header{padding:24px 32px 16px;flex-shrink:0}
+    .gallery-header h2{font-size:20px;font-weight:600;margin-bottom:4px}.gallery-header p{font-size:13px;color:var(--muted)}
+    .gallery-filters{display:flex;gap:6px;padding:0 32px 16px;flex-wrap:wrap;flex-shrink:0}
+    .chip{padding:4px 10px;font-size:11px;font-weight:500;color:var(--muted);background:var(--bg);border:1px solid var(--border);border-radius:20px;cursor:pointer;transition:all .15s}
+    .chip:hover{border-color:var(--muted);color:var(--text3)}.chip.active{border-color:var(--primary);color:var(--primary);background:var(--primary-dim)}
+    .gallery-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:12px;padding:0 32px 32px;overflow-y:auto;flex:1}
+    .tpl-card{display:flex;flex-direction:column;gap:8px;padding:16px;background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);cursor:pointer;transition:all .2s}
+    .tpl-card:hover{border-color:var(--primary);transform:translateY(-2px)}.tpl-card .tpl-cat{font-size:10px;font-weight:500;font-family:var(--mono);color:var(--primary);text-transform:uppercase;letter-spacing:.5px}
+    .tpl-card .tpl-name{font-size:14px;font-weight:600}.tpl-card .tpl-desc{font-size:11px;color:var(--muted)}
+
+    /* Editor */
+    .editor-view{display:none;width:100%;height:100%;flex-direction:column}.editor-view.active{display:flex}
+    .editor-topbar{display:flex;align-items:center;gap:10px;padding:0 16px;height:42px;background:var(--surface2);border-bottom:1px solid var(--border);flex-shrink:0}
+    .breadcrumb{display:flex;align-items:center;gap:6px;font-size:12px;color:var(--muted)}.breadcrumb .bc-current{color:var(--text);font-weight:500}
+    .editor-topbar .spacer{flex:1}
+    .editor-body{flex:1;overflow-y:auto;padding:24px;display:flex;gap:24px}
+    .editor-col{flex:1;display:flex;flex-direction:column;gap:18px;min-width:0}
+
+    /* Section Cards */
+    .sec-card{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:18px;display:flex;flex-direction:column;gap:12px;transition:border-color .2s}
+    .sec-card:hover{border-color:#444}
+    .sec-header{display:flex;align-items:center;gap:6px}.sec-dot{width:8px;height:8px;border-radius:50%;flex-shrink:0}
+    .sec-title{font-size:14px;font-weight:600}.sec-desc{font-size:13px;line-height:1.6;color:var(--text3)}
+    .sec-tags{display:flex;gap:6px;flex-wrap:wrap}
+    .sec-tag{padding:2px 8px;font-size:10px;font-weight:500;background:#2a2244;color:#9580fc;border-radius:5px}
+
+    /* Color swatches */
+    .swatch-header{display:flex;align-items:center;justify-content:space-between}
+    .swatch-add{font-size:10px;font-weight:500;color:var(--muted);cursor:pointer}.swatch-add:hover{color:var(--text3)}
+    .swatch-grid{display:flex;gap:10px}.swatch-item{flex:1;display:flex;flex-direction:column;align-items:center;gap:5px}
+    .swatch-color{width:100%;height:52px;border-radius:8px;cursor:pointer;transition:transform .12s;border:1px solid transparent}.swatch-color:hover{transform:scale(1.05)}
+    .swatch-color.dark{border-color:var(--border)}.swatch-name{font-size:10px;color:var(--text3)}.swatch-hex{font-size:9px;font-family:var(--mono);color:var(--muted2)}
+
+    /* Typography samples */
+    .typo-sample{display:flex;flex-direction:column;gap:3px}.typo-meta{font-size:10px;font-family:var(--mono);color:var(--muted2)}
+
+    /* Component preview */
+    .comp-btns{display:flex;gap:10px;flex-wrap:wrap}
+    .comp-btn-primary{padding:8px 16px;border-radius:4px;font-size:13px;border:none;cursor:default}
+    .comp-btn-ghost{padding:8px 16px;border-radius:4px;font-size:13px;background:transparent;cursor:default}
+    .comp-card-preview{padding:14px;background:var(--bg);border:1px solid var(--border);border-radius:6px;display:flex;flex-direction:column;gap:4px}
+    .comp-card-title{font-size:14px;font-weight:300;color:var(--text)}.comp-card-desc{font-size:11px;color:var(--muted)}
+
+    /* Spacing */
+    .spacing-row{display:flex;gap:10px;align-items:flex-end;flex-wrap:wrap}.spacing-item{display:flex;flex-direction:column;align-items:center;gap:4px}
+    .spacing-box{background:var(--primary);border-radius:2px;opacity:.6}.spacing-label{font-size:9px;font-family:var(--mono);color:var(--muted2)}
+    .radius-row{display:flex;gap:10px;align-items:flex-end;flex-wrap:wrap}.radius-item{display:flex;flex-direction:column;align-items:center;gap:4px}
+    .radius-box{width:36px;height:36px;border:2px solid var(--primary);opacity:.6}.radius-label{font-size:9px;font-family:var(--mono);color:var(--muted2)}
+
+    /* Depth */
+    .depth-row{display:flex;gap:12px}.depth-item{flex:1;display:flex;flex-direction:column;align-items:center;gap:4px}
+    .depth-box{width:100%;height:56px;background:var(--surface3);border-radius:8px}.depth-label{font-size:9px;font-family:var(--mono);color:var(--muted2)}
+
+    /* Do/Don't */
+    .dd-row{display:flex;gap:10px}.dd-box{flex:1;padding:12px;border-radius:8px;font-size:11px;line-height:1.7}
+    .dd-do{background:#0d2818;border:1px solid #1a4a2e;color:#4ade80}.dd-dont{background:#2a0d0d;border:1px solid #4a1a1a;color:#f87171}
+    .dd-title{font-size:12px;font-weight:600;margin-bottom:6px}
+
+    /* Responsive */
+    .resp-row{display:flex;gap:8px}.resp-item{flex:1;padding:10px;background:var(--surface3);border-radius:8px;display:flex;flex-direction:column;align-items:center;gap:6px}
+    .resp-item svg{color:var(--purple)}.resp-name{font-size:11px;font-weight:500;color:var(--text2)}.resp-size{font-size:9px;font-family:var(--mono);color:var(--muted2)}
+
+    /* Agent Guide */
+    .agent-refs{display:flex;flex-direction:column;gap:4px;font-size:11px;color:var(--text2)}
+    .agent-code{padding:12px;background:var(--bg);border-radius:8px;font-size:10px;font-family:var(--mono);color:var(--text3);line-height:1.7;display:flex;flex-direction:column;gap:2px}
+
+    /* Command Bar */
+    .command-bar{display:flex;align-items:center;gap:10px;padding:0 16px;height:42px;background:var(--surface2);border-top:1px solid var(--border);flex-shrink:0}
+    .command-bar svg{color:var(--primary);flex-shrink:0}
+    .command-bar input{flex:1;background:none;border:none;color:var(--text);font-size:12px;font-family:var(--sans);outline:none}.command-bar input::placeholder{color:var(--muted3)}
+    .kbd{display:flex;align-items:center;height:22px;padding:0 6px;background:var(--bg);border:1px solid var(--border);border-radius:4px;font-size:10px;font-family:var(--mono);color:var(--muted2);flex-shrink:0}
+
+    /* Toast */
+    .toast{position:fixed;bottom:56px;left:50%;transform:translateX(-50%) translateY(16px);background:var(--surface3);color:var(--text);padding:8px 16px;border-radius:8px;font-size:12px;border:1px solid var(--border);opacity:0;transition:all .25s;pointer-events:none;z-index:100}.toast.show{opacity:1;transform:translateX(-50%) translateY(0)}
+
+    /* Hidden textarea for raw MD */
+    .raw-md{display:none}
+  </style>
+</head>
+<body>
+  <div class="top-bar">
+    <div class="logo" onclick="showView('gallery')">
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="13.5" cy="6.5" r="2.5"/><circle cx="17.5" cy="15.5" r="2.5"/><circle cx="8.5" cy="15.5" r="2.5"/><path d="M12 2C6.5 2 2 6.5 2 12s4.5 10 10 10 10-4.5 10-10S17.5 2 12 2"/></svg>
+      <span>DesignMD</span>
+    </div>
+    <div class="sep"></div>
+    <div class="tab-bar">
+      <div class="tab active" data-view="gallery" onclick="showView('gallery')">
+        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></svg>
+        模版库
+      </div>
+      <div class="tab" data-view="editor" onclick="showView('editor')">
+        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14.5 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7.5L14.5 2z"/><polyline points="14,2 14,8 20,8"/></svg>
+        编辑器
+      </div>
+    </div>
+    <div class="url-bar">
+      <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/></svg>
+      <input type="url" id="urlInput" placeholder="粘贴网址提取设计语言..." autocomplete="off" spellcheck="false">
+    </div>
+    <button class="btn" id="extractBtn" onclick="extractDesign()">
+      <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 7V5a2 2 0 0 1 2-2h2"/><path d="M17 3h2a2 2 0 0 1 2 2v2"/><path d="M21 17v2a2 2 0 0 1-2 2h-2"/><path d="M7 21H5a2 2 0 0 1-2-2v-2"/></svg>
+      提取
+    </button>
+  </div>
+
+  <div class="main">
+    <!-- Gallery -->
+    <div class="gallery active" id="galleryView">
+      <div class="gallery-header"><h2>设计系统模版库</h2><p>59 个精选 DESIGN.md 文件，来自顶级产品。点击加载到编辑器。</p></div>
+      <div class="gallery-filters" id="galleryFilters"></div>
+      <div class="gallery-grid" id="galleryGrid"></div>
+    </div>
+
+    <!-- Editor -->
+    <div class="editor-view" id="editorView">
+      <div class="editor-topbar">
+        <div class="breadcrumb">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="cursor:pointer" onclick="showView('gallery')"><polyline points="15,18 9,12 15,6"/></svg>
+          <span style="cursor:pointer" onclick="showView('gallery')">模版库</span>
+          <span>/</span>
+          <span class="bc-current" id="bcName">—</span>
+        </div>
+        <div class="spacer"></div>
+        <button class="btn btn-secondary" onclick="copyMd()"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg> 复制 MD</button>
+        <button class="btn" onclick="downloadMd()"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7,10 12,15 17,10"/><line x1="12" y1="15" x2="12" y2="3"/></svg> 下载</button>
+      </div>
+      <div class="editor-body" id="editorBody">
+        <div class="editor-col" id="colLeft"></div>
+        <div class="editor-col" id="colRight"></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="command-bar">
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="m12 3-1.9 5.8a2 2 0 0 1-1.3 1.3L3 12l5.8 1.9a2 2 0 0 1 1.3 1.3L12 21l1.9-5.8a2 2 0 0 1 1.3-1.3L21 12l-5.8-1.9a2 2 0 0 1-1.3-1.3L12 3Z"/></svg>
+    <input type="text" id="commandInput" placeholder="\"把主色改成深蓝\"  \"圆角改成12px\"  \"加一个阴影段落\"" autocomplete="off" spellcheck="false">
+    <div class="kbd">⌘ Enter</div>
+  </div>
+  <div class="toast" id="toast"></div>
+  <textarea class="raw-md" id="rawMd"></textarea>
+
+<script>
+// ─── State ────────────────────────────────────────
+let allTemplates=[], currentFilter='全部', currentDesign=null, currentName='';
+const CATEGORY_ZH={AI:'AI',Developer:'开发者',Design:'设计',Fintech:'金融',Consumer:'消费',Automotive:'汽车',Infrastructure:'基础设施',Productivity:'生产力',Enterprise:'企业'};
+
+// ─── Views ────────────────────────────────────────
+function showView(v){
+  document.querySelectorAll('.tab').forEach(t=>t.classList.toggle('active',t.dataset.view===v));
+  document.getElementById('galleryView').classList.toggle('active',v==='gallery');
+  document.getElementById('editorView').classList.toggle('active',v==='editor');
+}
+
+// ─── Gallery ──────────────────────────────────────
+async function loadTemplates(){
+  try{const r=await fetch('/api/templates');allTemplates=await r.json();renderGallery()}catch{document.getElementById('galleryGrid').innerHTML='<p style="color:var(--muted);padding:20px">加载失败</p>'}
+}
+function renderGallery(){
+  const cats=['全部',...new Set(allTemplates.map(t=>CATEGORY_ZH[t.category]||t.category))].sort((a,b)=>a==='全部'?-1:a.localeCompare(b));
+  document.getElementById('galleryFilters').innerHTML=cats.map(c=>`<div class="chip ${c===currentFilter?'active':''}" onclick="filterGallery('${c}')">${c}</div>`).join('');
+  const filtered=currentFilter==='全部'?allTemplates:allTemplates.filter(t=>(CATEGORY_ZH[t.category]||t.category)===currentFilter);
+  document.getElementById('galleryGrid').innerHTML=filtered.map(t=>`<div class="tpl-card" onclick="loadTemplate('${t.id}')"><div class="tpl-cat">${CATEGORY_ZH[t.category]||t.category}</div><div class="tpl-name">${t.name}</div><div class="tpl-desc">${t.desc}</div></div>`).join('');
+}
+function filterGallery(c){currentFilter=c;renderGallery()}
+
+async function loadTemplate(id){
+  showToast('加载中...');
+  try{
+    const r=await fetch('/api/templates/'+encodeURIComponent(id));if(!r.ok)throw new Error((await r.json()).error);
+    const{content}=await r.json();
+    document.getElementById('rawMd').value=content;
+    currentName=allTemplates.find(t=>t.id===id)?.name||id;
+    document.getElementById('bcName').textContent=currentName;
+    currentDesign=parseDesignMd(content);
+    renderEditor();showView('editor');showToast(currentName+' 已加载');
+  }catch(e){showToast('错误: '+e.message)}
+}
+
+// ─── Extract ──────────────────────────────────────
+async function extractDesign(){
+  const url=document.getElementById('urlInput').value.trim();if(!url)return;
+  const btn=document.getElementById('extractBtn');btn.disabled=true;btn.classList.add('loading');
+  try{
+    const r=await fetch('/api/extract',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({url})});
+    if(!r.ok)throw new Error((await r.json()).error);
+    const data=await r.json();const md=generateStitchMd(data,url);
+    document.getElementById('rawMd').value=md;
+    currentName=new URL(url).hostname.replace('www.','');
+    document.getElementById('bcName').textContent=currentName;
+    currentDesign=parseDesignMd(md);renderEditor();showView('editor');showToast('提取成功！');
+  }catch(e){showToast('错误: '+e.message)}
+  finally{btn.disabled=false;btn.classList.remove('loading')}
+}
+
+// ─── Parse DESIGN.md into structured data ─────────
+function parseDesignMd(md){
+  const sections=[];let cur=null;
+  for(const line of md.split('\n')){
+    const h2=line.match(/^##\s+(\d+)\.\s+(.+)/);
+    if(h2){if(cur)sections.push(cur);cur={num:parseInt(h2[1]),title:h2[2].trim(),lines:[],items:[],tables:[],dos:[],donts:[]};continue}
+    if(!cur)continue;
+    cur.lines.push(line);
+    const boldItem=line.match(/^-\s+\*\*(.+?)\*\*\s*\(`([^`]+)`\):\s*(.*)/);
+    if(boldItem)cur.items.push({name:boldItem[1],value:boldItem[2],desc:boldItem[3]});
+    const simpleItem=line.match(/^-\s+(.+?):\s*`?([^`\n]+)`?\s*$/);
+    if(simpleItem&&!boldItem)cur.items.push({name:simpleItem[1].replace(/\*\*/g,''),value:simpleItem[2]});
+    const tableRow=line.match(/^\|(.+)\|$/);
+    if(tableRow&&!line.includes('---'))cur.tables.push(tableRow[1].split('|').map(c=>c.trim()));
+    if(line.startsWith('- ')&&cur.num===7){
+      const lastH3=cur.lines.filter(l=>l.startsWith('### ')).pop()||'';
+      if(lastH3.includes("Don't")||lastH3.includes("don't")||lastH3.includes('避免'))cur.donts.push(line.slice(2));
+      else if(lastH3.includes('Do ')||lastH3==='### Do'||lastH3.includes('推荐'))cur.dos.push(line.slice(2));
+    }
+  }
+  if(cur)sections.push(cur);return sections;
+}
+
+// ─── Render visual editor ─────────────────────────
+const SEC_META=[
+  {num:1,zh:'视觉主题',color:'#7C5CFC'},
+  {num:2,zh:'调色板',color:'#5CAAFC'},
+  {num:3,zh:'字体排版',color:'#22c55e'},
+  {num:4,zh:'组件样式',color:'#f59e0b'},
+  {num:5,zh:'布局与间距',color:'#f97316'},
+  {num:6,zh:'层深与阴影',color:'#06b6d4'},
+  {num:7,zh:'规范指南',color:'#10b981'},
+  {num:8,zh:'响应式适配',color:'#a855f7'},
+  {num:9,zh:'AI 提示指南',color:'#ec4899'}
+];
+
+function renderEditor(){
+  if(!currentDesign||!currentDesign.length)return;
+  const left=document.getElementById('colLeft');
+  const right=document.getElementById('colRight');
+  left.innerHTML='';right.innerHTML='';
+  const leftNums=[1,2,5,7,9],rightNums=[3,4,6,8];
+  for(const sec of currentDesign){
+    const meta=SEC_META.find(m=>m.num===sec.num)||{zh:'段落 '+sec.num,color:'#888'};
+    const html=renderSection(sec,meta);
+    if(leftNums.includes(sec.num))left.innerHTML+=html;
+    else right.innerHTML+=html;
+  }
+}
+
+function renderSection(sec,meta){
+  let inner='';
+  switch(sec.num){
+    case 1:inner=renderTheme(sec);break;
+    case 2:inner=renderColors(sec);break;
+    case 3:inner=renderTypo(sec);break;
+    case 4:inner=renderComponents(sec);break;
+    case 5:inner=renderLayout(sec);break;
+    case 6:inner=renderDepth(sec);break;
+    case 7:inner=renderDosDonts(sec);break;
+    case 8:inner=renderResponsive(sec);break;
+    case 9:inner=renderAgentGuide(sec);break;
+    default:inner=`<div class="sec-desc">${sec.lines.filter(l=>l.length>10).slice(0,3).join('<br>')}</div>`;
+  }
+  return `<div class="sec-card"><div class="sec-header"><div class="sec-dot" style="background:${meta.color}"></div><div class="sec-title">${meta.zh}</div></div>${inner}</div>`;
+}
+
+function renderTheme(sec){
+  const desc=sec.lines.filter(l=>l.length>20&&!l.startsWith('-')&&!l.startsWith('**')&&!l.startsWith('#')).slice(0,2).join(' ').substring(0,200);
+  const chars=sec.lines.filter(l=>l.startsWith('- ')).slice(0,5);
+  let tags='';
+  const kwRegex=/dark|light|minimal|premium|fintech|bold|clean|geometric|luxury/gi;
+  const kws=[...new Set((desc.match(kwRegex)||[]).map(k=>k.toLowerCase()))].slice(0,3);
+  if(kws.length)tags=`<div class="sec-tags">${kws.map(k=>`<span class="sec-tag">${k}</span>`).join('')}</div>`;
+  let charHtml=chars.length?'<div style="margin-top:4px;display:flex;flex-direction:column;gap:3px">'+chars.map(c=>{
+    const m=c.match(/^-\s+(.+)/);return m?`<div style="font-size:11px;color:var(--text3)"><span style="color:var(--primary)">·</span> ${m[1].substring(0,80)}</div>`:'';
+  }).join('')+'</div>':'';
+  return `<div class="sec-desc">${desc||'暂无描述'}</div>${tags}${charHtml}`;
+}
+
+function renderColors(sec){
+  const colorItems=sec.items.filter(i=>i.value&&i.value.match(/#[0-9a-fA-F]{3,8}/));
+  if(!colorItems.length)return '<div class="sec-desc">暂无颜色数据</div>';
+  const swatches=colorItems.slice(0,8).map(c=>{
+    const dark=isColorDark(c.value);
+    return `<div class="swatch-item"><div class="swatch-color ${dark?'dark':''}" style="background:${c.value}" title="${c.name}: ${c.value}"></div><div class="swatch-name">${c.name}</div><div class="swatch-hex">${c.value}</div></div>`;
+  }).join('');
+  return `<div class="swatch-header"><span></span><span class="swatch-add">+ 添加</span></div><div class="swatch-grid">${swatches}</div>`;
+}
+
+function renderTypo(sec){
+  const fontItems=sec.items.filter(i=>['Primary','Secondary','Monospace','主字体','副字体','等宽'].some(k=>i.name.includes(k)));
+  const table=sec.tables.filter(r=>r.length>=4&&r[0]!=='Role'&&r[0]!=='角色');
+  let html='';
+  if(fontItems.length){
+    const sizes=[28,20,14];
+    html+=fontItems.slice(0,3).map((f,i)=>{
+      const ff=f.value.split(',')[0].trim();
+      return `<div class="typo-sample"><div style="font-family:'${ff}',var(--sans);font-size:${sizes[i]||14}px;font-weight:${i<2?300:400};color:var(--text);letter-spacing:${i===0?'-0.8px':i===1?'-0.4px':'normal'}">${i===0?'展示标题':i===1?'章节标题':'正文文字，轻盈且自信。'}</div><span class="typo-meta">${ff} · ${sizes[i]||14}px · 字重 ${i<2?300:400}</span></div>`;
+    }).join('');
+  }
+  if(table.length){
+    html+=`<div style="overflow-x:auto;margin-top:8px"><table style="width:100%;border-collapse:collapse;font-size:11px"><thead><tr>${table[0].map(h=>`<th style="text-align:left;padding:4px 6px;color:var(--muted);border-bottom:1px solid var(--border);font-weight:500">${h}</th>`).join('')}</tr></thead><tbody>${table.slice(1).map(r=>`<tr>${r.map(c=>`<td style="padding:4px 6px;border-bottom:1px solid var(--border);color:var(--text2)">${c}</td>`).join('')}</tr>`).join('')}</tbody></table></div>`;
+  }
+  return html||'<div class="sec-desc">暂无字体数据</div>';
+}
+
+function renderComponents(sec){
+  const subsections=[];let cur=null;
+  sec.lines.forEach(l=>{
+    const h3=l.match(/^###\s+(.+)/);
+    if(h3){if(cur)subsections.push(cur);cur={name:h3[1],props:[]};return}
+    if(cur){const p=l.match(/^-\s+(.+?):\s*(.+)/);if(p)cur.props.push({k:p[1].replace(/\*\*/g,''),v:p[2]})}
+  });
+  if(cur)subsections.push(cur);
+  if(!subsections.length)return '<div class="sec-desc">暂无组件数据</div>';
+
+  // Try to render actual button previews
+  const btnSec=subsections.find(s=>s.name.match(/button|按钮/i));
+  let btnHtml='';
+  if(btnSec){
+    const bg=btnSec.props.find(p=>p.k.match(/background|背景/i))?.v?.match(/#[0-9a-fA-F]+/)?.[0]||'#533afd';
+    const radius=btnSec.props.find(p=>p.k.match(/radius|圆角/i))?.v||'4px';
+    btnHtml=`<div class="comp-btns"><div class="comp-btn-primary" style="background:${bg};color:#fff;border-radius:${radius}">立即开始</div><div class="comp-btn-ghost" style="border:1px solid ${bg};color:${bg};border-radius:${radius}">联系销售</div></div>`;
+  }
+
+  let cards=subsections.filter(s=>s!==btnSec).slice(0,2).map(s=>{
+    const props=s.props.slice(0,3).map(p=>`<div style="font-size:10px;color:var(--text3)">${p.k}: <code style="font-size:9px;background:var(--bg);padding:1px 3px;border-radius:2px">${p.v}</code></div>`).join('');
+    return `<div class="comp-card-preview"><div class="comp-card-title">${s.name}</div>${props}</div>`;
+  }).join('');
+
+  return btnHtml+cards;
+}
+
+function renderLayout(sec){
+  // Spacing
+  const spacingItems=sec.items.filter(i=>i.value&&i.value.match(/\d+px/));
+  const radiusItems=sec.items.filter(i=>i.name.match(/micro|standard|comfortable|relaxed|large|xl|pill|level|标准|舒适|小|大/i));
+  let html='';
+  const scaleMatch=sec.lines.find(l=>l.match(/scale|刻度/i));
+  const baseMatch=sec.lines.find(l=>l.match(/base|基础/i));
+  if(baseMatch)html+=`<div style="font-size:11px;color:var(--text3);margin-bottom:8px">${baseMatch.replace(/^-\s+/,'')}</div>`;
+
+  if(spacingItems.length||scaleMatch){
+    const vals=[];
+    if(scaleMatch){const nums=scaleMatch.match(/\d+/g);if(nums)nums.forEach(n=>vals.push(parseInt(n)))}
+    if(!vals.length)spacingItems.forEach(s=>{const n=parseInt(s.value);if(n>0&&n<=64)vals.push(n)});
+    if(vals.length){
+      html+=`<div class="spacing-row">${vals.filter(v=>v<=48).slice(0,6).map(v=>`<div class="spacing-item"><div class="spacing-box" style="width:${v}px;height:${v}px"></div><span class="spacing-label">${v}</span></div>`).join('')}</div>`;
+    }
+  }
+
+  if(radiusItems.length){
+    html+=`<div style="font-size:11px;font-weight:500;color:var(--text3);margin-top:12px;margin-bottom:6px">圆角</div>`;
+    html+=`<div class="radius-row">${radiusItems.slice(0,5).map(r=>`<div class="radius-item"><div class="radius-box" style="border-radius:${r.value}"></div><span class="radius-label">${r.value}</span></div>`).join('')}</div>`;
+  }
+  return html||'<div class="sec-desc">暂无布局数据</div>';
+}
+
+function renderDepth(sec){
+  const table=sec.tables.filter(r=>r.length>=3&&!r[0].match(/level|级别/i));
+  if(table.length){
+    return `<div class="depth-row">${table.slice(0,4).map(r=>{
+      const shadow=r[1]?.match(/`([^`]+)`/)?.[1]||'';
+      return `<div class="depth-item"><div class="depth-box" style="${shadow?'box-shadow:'+shadow:''}"></div><span class="depth-label">${(r[0]||'').substring(0,8)}</span></div>`;
+    }).join('')}</div>`;
+  }
+  // Fallback: render 4 levels
+  return `<div class="depth-row">
+    <div class="depth-item"><div class="depth-box"></div><span class="depth-label">无阴影</span></div>
+    <div class="depth-item"><div class="depth-box" style="box-shadow:0 3px 6px rgba(23,23,23,0.15)"></div><span class="depth-label">微弱</span></div>
+    <div class="depth-item"><div class="depth-box" style="box-shadow:0 8px 20px rgba(50,50,93,0.25)"></div><span class="depth-label">标准</span></div>
+    <div class="depth-item"><div class="depth-box" style="box-shadow:0 14px 35px rgba(50,50,93,0.35)"></div><span class="depth-label">悬浮</span></div>
+  </div>`;
+}
+
+function renderDosDonts(sec){
+  if(!sec.dos.length&&!sec.donts.length)return '<div class="sec-desc">暂无规范数据</div>';
+  return `<div class="dd-row">
+    <div class="dd-box dd-do"><div class="dd-title" style="color:#22c55e">✓ 推荐</div>${sec.dos.map(d=>`<div>· ${d}</div>`).join('')}</div>
+    <div class="dd-box dd-dont"><div class="dd-title" style="color:#ef4444">✗ 避免</div>${sec.donts.map(d=>`<div>· ${d}</div>`).join('')}</div>
+  </div>`;
+}
+
+function renderResponsive(sec){
+  const table=sec.tables.filter(r=>r.length>=3&&!r[0].match(/name|名称/i));
+  const icons={Mobile:'smartphone',Tablet:'tablet',Desktop:'monitor','Large Desktop':'monitor'};
+  const zhNames={Mobile:'移动端',Tablet:'平板',Desktop:'桌面端','Large Desktop':'大屏'};
+  if(table.length){
+    return `<div class="resp-row">${table.slice(0,3).map(r=>{
+      const icon=icons[r[0]]||'monitor';const zh=zhNames[r[0]]||r[0];
+      return `<div class="resp-item"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><use href="#icon-${icon}"/></svg><div class="resp-name">${zh}</div><div class="resp-size">${r[1]}</div></div>`;
+    }).join('')}</div>`;
+  }
+  return `<div class="resp-row">
+    <div class="resp-item"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="5" y="2" width="14" height="20" rx="2"/><line x1="12" y1="18" x2="12" y2="18"/></svg><div class="resp-name">移动端</div><div class="resp-size">&lt;640px</div></div>
+    <div class="resp-item"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="4" y="3" width="16" height="18" rx="2"/><line x1="12" y1="17" x2="12" y2="17"/></svg><div class="resp-name">平板</div><div class="resp-size">640-1024px</div></div>
+    <div class="resp-item"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="2" y="3" width="20" height="14" rx="2"/><line x1="8" y1="21" x2="16" y2="21"/><line x1="12" y1="17" x2="12" y2="21"/></svg><div class="resp-name">桌面端</div><div class="resp-size">&gt;1024px</div></div>
+  </div>`;
+}
+
+function renderAgentGuide(sec){
+  const refs=sec.items.filter(i=>i.value&&i.value.match(/#[0-9a-fA-F]/));
+  const guides=sec.lines.filter(l=>l.match(/^\d+\.\s/));
+  let html='';
+  if(refs.length){
+    html+=`<div class="agent-refs">${refs.slice(0,6).map(r=>`<div><span style="color:var(--primary)">→</span> ${r.name}: <code style="font-size:10px;background:var(--bg);padding:1px 4px;border-radius:3px">${r.value}</code></div>`).join('')}</div>`;
+  }
+  if(guides.length){
+    html+=`<div class="agent-code">${guides.slice(0,5).map(g=>`<div>${g}</div>`).join('')}</div>`;
+  }
+  return html||'<div class="sec-desc">暂无提示指南</div>';
+}
+
+// ─── Generate Stitch MD from extracted data ───────
+function generateStitchMd(data,url){
+  const host=new URL(url).hostname.replace('www.','');
+  const pf=data.fonts[0]?.name||'System';
+  const L=[];
+  L.push(`# Design System Inspiration of ${data.title||host}\n`);
+  L.push(`## 1. Visual Theme & Atmosphere\n`);
+  L.push(`The visual identity of ${host} is built on a ${isColorDark(data.colors[0]?.value||'#fff')?'dark':'light'} foundation with ${pf} as the primary typeface.\n`);
+  L.push('**Key Characteristics:**');
+  data.colors.slice(0,3).forEach(c=>L.push(`- Key color: \`${c.value}\``));
+  data.fonts.slice(0,2).forEach(f=>L.push(`- Font: ${f.name}`));
+  L.push('');
+  L.push('## 2. Color Palette & Roles\n');
+  L.push('### Primary');
+  const roles=['Background','Surface','Text Primary','Text Secondary','Primary','Secondary','Accent','Border'];
+  data.colors.slice(0,8).forEach((c,i)=>L.push(`- **${roles[i]||'Color-'+(i+1)}** (\`${c.value}\`): Interface color`));
+  L.push('');
+  L.push('## 3. Typography Rules\n');
+  L.push('### Font Family');
+  data.fonts.forEach((f,i)=>L.push(`- **${i===0?'Primary':i===1?'Secondary':'Monospace'}**: ${f.name}`));
+  L.push('\n### Hierarchy\n');
+  L.push('| Role | Font | Size | Weight | Notes |');L.push('|------|------|------|--------|-------|');
+  const typoR=['Display Hero','Display Large','Section Heading','Sub-heading','Body Large','Body','Button','Caption','Micro'];
+  data.fontSizes.sort((a,b)=>b-a).slice(0,9).forEach((s,i)=>L.push(`| ${typoR[i]||'Level'} | ${pf} | ${s}px | ${i<3?'600':'400'} | — |`));
+  L.push('');
+  L.push('## 4. Component Stylings\n');
+  L.push('### Buttons');
+  L.push(`- Background: \`${data.colors[4]?.value||'#333'}\``);
+  L.push(`- Text: \`#ffffff\``);
+  L.push(`- Radius: ${data.borderRadii[0]||'4px'}`);
+  L.push('\n### Cards & Containers');
+  L.push(`- Background: \`${data.colors[1]?.value||'#fff'}\``);
+  L.push(`- Border: 1px solid \`${data.colors[7]?.value||'#e5e5e5'}\``);
+  L.push(`- Radius: ${data.borderRadii[1]||'8px'}`);
+  if(data.shadows[0])L.push(`- Shadow: \`${data.shadows[0]}\``);
+  L.push('');
+  L.push('## 5. Layout Principles\n');
+  L.push('### Spacing System');
+  L.push(`- Base unit: ${data.spacings[1]||8}px`);
+  L.push(`- Scale: ${data.spacings.join('px, ')}px`);
+  L.push('\n### Border Radius Scale');
+  const rNames=['Micro','Standard','Comfortable','Relaxed','Large','XL'];
+  data.borderRadii.forEach((r,i)=>L.push(`- ${rNames[i]||'Level-'+(i+1)}: ${r}`));
+  L.push('');
+  L.push('## 6. Depth & Elevation\n');
+  L.push('| Level | Treatment | Use |');L.push('|-------|-----------|-----|');
+  L.push('| Flat (Level 0) | No shadow | Background |');
+  data.shadows.slice(0,3).forEach((s,i)=>L.push(`| Level ${i+1} | \`${s.substring(0,60)}...\` | Elevated |`));
+  L.push('');
+  L.push("## 7. Do's and Don'ts\n");
+  L.push('### Do');
+  L.push(`- Use ${pf} consistently`);L.push(`- Keep border-radius within range`);L.push(`- Maintain color consistency`);
+  L.push("\n### Don't");
+  L.push("- Don't mix font families");L.push("- Don't use colors outside palette");L.push("- Don't override spacing scale");
+  L.push('');
+  L.push('## 8. Responsive Behavior\n');
+  L.push('### Breakpoints');
+  L.push('| Name | Width | Key Changes |');L.push('|------|-------|-------------|');
+  L.push('| Mobile | <640px | Single column |');L.push('| Tablet | 640-1024px | 2-column |');L.push('| Desktop | >1024px | Full layout |');
+  L.push('');
+  L.push('## 9. Agent Prompt Guide\n');
+  L.push('### Quick Color Reference');
+  data.colors.slice(0,6).forEach((c,i)=>L.push(`- ${roles[i]||'Color'}: \`${c.value}\``));
+  L.push('\n### Iteration Guide');
+  L.push(`1. Use ${pf} for all text`);
+  L.push(`2. Primary color: \`${data.colors[4]?.value||data.colors[0]?.value}\``);
+  L.push(`3. Background: \`${data.colors[0]?.value}\``);
+  L.push(`4. Border-radius: ${data.borderRadii[0]||'4px'} for buttons`);
+  L.push('');
+  return L.join('\n');
+}
+
+// ─── Utils ────────────────────────────────────────
+function isColorDark(hex){
+  if(!hex||!hex.startsWith('#'))return false;
+  hex=hex.replace('#','');if(hex.length===3)hex=hex[0]+hex[0]+hex[1]+hex[1]+hex[2]+hex[2];
+  const r=parseInt(hex.substr(0,2),16),g=parseInt(hex.substr(2,2),16),b=parseInt(hex.substr(4,2),16);
+  return(r*299+g*587+b*114)/1000<50;
+}
+
+// ─── Command bar ──────────────────────────────────
+document.getElementById('commandInput').addEventListener('keydown',e=>{
+  if((e.metaKey||e.ctrlKey)&&e.key==='Enter'){executeCommand(e.target.value.trim());e.target.value=''}
+});
+function executeCommand(cmd){
+  if(!cmd)return;
+  let md=document.getElementById('rawMd').value;
+  const colorChange=cmd.match(/(?:把|change|set|改)\s*(\S+?)\s*(?:改成|改为|to|变成)\s*(#[0-9a-fA-F]{3,8}|\S+)/i);
+  if(colorChange){
+    const[,name,color]=colorChange;const hex=namedToHex(color);
+    const re1=new RegExp(`(\\*\\*${name}\\*\\*\\s*\\()\`[^)]+\`(\\))`,'i');
+    const re2=new RegExp(`(- ${name}:)\\s*\`?#[0-9a-fA-F]{3,8}\`?`,'i');
+    if(re1.test(md)){md=md.replace(re1,`$1\`${hex}\`$2`)}
+    else if(re2.test(md)){md=md.replace(re2,`$1 \`${hex}\``)}
+    else{showToast('未找到: '+name);return}
+    document.getElementById('rawMd').value=md;currentDesign=parseDesignMd(md);renderEditor();showToast(`已更新 ${name} → ${hex}`);return;
+  }
+  const addSec=cmd.match(/(?:加|添加|add)\s*(?:一个?)?\s*(.+)\s*(?:段落|section)/i);
+  if(addSec){md+=`\n\n## ${addSec[1].trim()}\n\n- item: value`;document.getElementById('rawMd').value=md;currentDesign=parseDesignMd(md);renderEditor();showToast('已添加段落');return}
+  const rename=cmd.match(/(?:rename|重命名|把)\s+(\S+)\s+(?:to|改为|改成)\s+(\S+)/i);
+  if(rename){const re=new RegExp(rename[1],'gi');if(re.test(md)){md=md.replace(re,rename[2]);document.getElementById('rawMd').value=md;currentDesign=parseDesignMd(md);renderEditor();showToast('已重命名');return}}
+  showToast('试试: "把Primary改成#FF0000"');
+}
+function namedToHex(c){if(c.startsWith('#'))return c.toUpperCase();return{红:'#FF0000',蓝:'#0066FF',绿:'#00CC66',黑:'#000000',白:'#FFFFFF',橙:'#FF8800',紫:'#7C5CFC',粉:'#FF66AA',黄:'#FFCC00',青:'#00CCFF',灰:'#888888',深蓝:'#003366',浅蓝:'#66CCFF',red:'#FF0000',blue:'#0066FF',green:'#00CC66',black:'#000000',white:'#FFFFFF',purple:'#7C5CFC',orange:'#FF8800'}[c]||c}
+
+// ─── Copy/Download ────────────────────────────────
+function copyMd(){navigator.clipboard.writeText(document.getElementById('rawMd').value);showToast('已复制！')}
+function downloadMd(){const a=document.createElement('a');a.href=URL.createObjectURL(new Blob([document.getElementById('rawMd').value],{type:'text/markdown'}));a.download='DESIGN.md';a.click();showToast('已下载')}
+function showToast(m){const t=document.getElementById('toast');t.textContent=m;t.classList.add('show');setTimeout(()=>t.classList.remove('show'),2200)}
+
+// ─── URL enter ────────────────────────────────────
+document.getElementById('urlInput').addEventListener('keydown',e=>{if(e.key==='Enter')extractDesign()});
+
+// ─── Init ─────────────────────────────────────────
+loadTemplates();
+</script>
+</body>
+</html>

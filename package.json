@@ -1,0 +1,15 @@
+{
+  "name": "design-md-tool",
+  "version": "1.0.0",
+  "description": "Extract design language from websites and generate design.md files",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js",
+    "dev": "node server.js"
+  },
+  "dependencies": {
+    "express": "^4.18.2",
+    "puppeteer": "^22.0.0",
+    "marked": "^12.0.0"
+  }
+}
