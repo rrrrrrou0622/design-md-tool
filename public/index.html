@@ -257,7 +257,14 @@
       <h1 class="hero-title">把任何网站的设计语言<span class="accent">变成 AI 能读懂的文件</span></h1>
       <p class="hero-sub">粘贴网址 · 选择模版 · 直接描述。AI 生成完整 DESIGN.md，Claude Code / Cursor 里直接用。</p>
       <div class="prompt-box">
+        <div id="imgPreview" style="display:none;position:relative;width:100%;max-height:240px;border-radius:8px;overflow:hidden;border:1px solid var(--border)">
+          <img id="imgPreviewEl" style="width:100%;max-height:240px;object-fit:contain;display:block;background:#000">
+          <button onclick="clearImage()" style="position:absolute;top:8px;right:8px;width:26px;height:26px;border-radius:50%;background:rgba(0,0,0,0.7);color:#fff;display:flex;align-items:center;justify-content:center;cursor:pointer;border:none">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+          </button>
+        </div>
         <textarea class="prompt-input" id="promptInput" placeholder="粘贴一个网址，或者告诉我你想要什么风格的设计系统..." rows="2"></textarea>
+        <input type="file" id="fileInput" accept="image/*" style="display:none" onchange="handleFile(event)">
         <div class="prompt-bottom">
           <button class="prompt-tool" onclick="pickFile()">
             <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="9" cy="9" r="2"/><path d="m21 15-3.086-3.086a2 2 0 0 0-2.828 0L6 21"/></svg>
@@ -652,9 +659,33 @@ function isColorLight(hex){
   return(r*299+g*587+b*114)/1000>200;
 }
 
-function handleGenerate(){
+async function handleGenerate(){
   const val=document.getElementById('promptInput').value.trim();
-  if(!val){showToast('请输入内容');return}
+
+  // 1. If image uploaded, analyze it
+  if(uploadedImage){
+    const btn=document.getElementById('genBtn');
+    btn.disabled=true;btn.classList.add('loading');
+    showToast('分析截图中...');
+    try{
+      const analysis=await analyzeImage(uploadedImage);
+      const md=generateMdFromImage(analysis,val);
+      document.getElementById('rawMd').value=md;
+      document.getElementById('bcName').textContent='截图分析';
+      document.getElementById('bcDot').style.background=analysis.primary;
+      currentDesign=parseDesignMd(md);
+      renderEditor();
+      showView('editor');
+      clearImage();
+      document.getElementById('promptInput').value='';
+      showToast('分析完成！');
+    }catch(e){showToast('分析失败: '+e.message)}
+    finally{btn.disabled=false;btn.classList.remove('loading')}
+    return;
+  }
+
+  // 2. If URL, extract
+  if(!val){showToast('请输入网址或上传截图');return}
   if(val.match(/^https?:\/\//i)||val.match(/^[\w-]+\.[\w-]+/)){
     const url=val.match(/^https?:\/\//i)?val:'https://'+val;
     extractFromUrl(url);
@@ -725,7 +756,218 @@ function generateStitchMd(data,url){
   return L.join('\n');
 }
 
-function pickFile(){showToast('截图功能开发中')}
+let uploadedImage=null;
+
+function pickFile(){document.getElementById('fileInput').click()}
+
+function handleFile(e){
+  const file=e.target.files[0];
+  if(!file)return;
+  if(!file.type.startsWith('image/')){showToast('请上传图片');return}
+  const reader=new FileReader();
+  reader.onload=(ev)=>{
+    uploadedImage=ev.target.result;
+    document.getElementById('imgPreviewEl').src=uploadedImage;
+    document.getElementById('imgPreview').style.display='block';
+    document.getElementById('promptInput').placeholder='描述这张截图的风格（可选）...';
+    showToast('已加载图片，点击"生成"开始分析');
+  };
+  reader.readAsDataURL(file);
+}
+
+function clearImage(){
+  uploadedImage=null;
+  document.getElementById('imgPreview').style.display='none';
+  document.getElementById('fileInput').value='';
+  document.getElementById('promptInput').placeholder='粘贴一个网址，或者告诉我你想要什么风格的设计系统...';
+}
+
+// Analyze image — extract dominant colors via Canvas pixel sampling
+async function analyzeImage(dataUrl){
+  return new Promise((resolve)=>{
+    const img=new Image();
+    img.onload=()=>{
+      const canvas=document.createElement('canvas');
+      const maxSize=300;
+      const scale=Math.min(maxSize/img.width,maxSize/img.height,1);
+      canvas.width=img.width*scale;
+      canvas.height=img.height*scale;
+      const ctx=canvas.getContext('2d');
+      ctx.drawImage(img,0,0,canvas.width,canvas.height);
+      const imageData=ctx.getImageData(0,0,canvas.width,canvas.height).data;
+
+      // Bucket colors into groups (quantize to reduce noise)
+      const buckets=new Map();
+      for(let i=0;i<imageData.length;i+=4){
+        const a=imageData[i+3];
+        if(a<200)continue;
+        // Quantize to 16 levels per channel (reduces to manageable set)
+        const r=Math.round(imageData[i]/16)*16;
+        const g=Math.round(imageData[i+1]/16)*16;
+        const b=Math.round(imageData[i+2]/16)*16;
+        const key=`${r},${g},${b}`;
+        buckets.set(key,(buckets.get(key)||0)+1);
+      }
+
+      // Sort by frequency
+      const sorted=[...buckets.entries()].sort((a,b)=>b[1]-a[1]);
+
+      // Pick diverse colors (skip too-similar ones)
+      const picked=[];
+      const MIN_DIST=50;
+      for(const [key,count] of sorted){
+        const [r,g,b]=key.split(',').map(Number);
+        const tooClose=picked.some(p=>{
+          const dr=p.r-r,dg=p.g-g,db=p.b-b;
+          return Math.sqrt(dr*dr+dg*dg+db*db)<MIN_DIST;
+        });
+        if(!tooClose){
+          picked.push({r,g,b,count});
+          if(picked.length>=10)break;
+        }
+      }
+
+      // Find background (most common)
+      const bgColor=picked[0];
+      const isDark=(bgColor.r*299+bgColor.g*587+bgColor.b*114)/1000<128;
+
+      // Classify into roles
+      const toHex=(c)=>'#'+[c.r,c.g,c.b].map(x=>x.toString(16).padStart(2,'0')).join('').toUpperCase();
+
+      // Find colors by characteristics
+      const colorful=picked.filter(c=>{
+        const max=Math.max(c.r,c.g,c.b);
+        const min=Math.min(c.r,c.g,c.b);
+        return max-min>60; // saturated
+      }).sort((a,b)=>b.count-a.count);
+
+      const neutrals=picked.filter(c=>{
+        const max=Math.max(c.r,c.g,c.b);
+        const min=Math.min(c.r,c.g,c.b);
+        return max-min<=60;
+      }).sort((a,b)=>b.count-a.count);
+
+      resolve({
+        background:toHex(bgColor),
+        isDark,
+        primary:toHex(colorful[0]||picked[1]||bgColor),
+        secondary:toHex(colorful[1]||neutrals[1]||bgColor),
+        surface:toHex(neutrals[1]||bgColor),
+        text:isDark?'#FFFFFF':'#111111',
+        textSecondary:toHex(neutrals[2]||{r:128,g:128,b:128}),
+        accent:toHex(colorful[2]||colorful[0]||picked[1]||bgColor),
+        border:toHex(neutrals[3]||{r:200,g:200,b:200}),
+        muted:toHex(neutrals[2]||{r:150,g:150,b:150}),
+        allColors:picked.slice(0,8).map(c=>({value:toHex(c),count:c.count}))
+      });
+    };
+    img.src=dataUrl;
+  });
+}
+
+function generateMdFromImage(analysis,userPrompt){
+  const isDark=analysis.isDark;
+  const moodWords=isDark?'沉稳、现代、专业':'清新、明亮、友好';
+  const L=[];
+  L.push(`# Design System Inspiration from Screenshot\n`);
+  L.push(`## 1. Visual Theme & Atmosphere\n`);
+  L.push(`The visual identity is built on a ${isDark?'dark':'light'} foundation with a ${analysis.background} background. ${userPrompt?'User intent: '+userPrompt+'. ':''}The mood feels ${isDark?'sophisticated and modern':'clean and approachable'}, with ${analysis.primary} as the signature brand color.\n`);
+  L.push('**Key Characteristics:**');
+  L.push(`- ${isDark?'Dark':'Light'}-mode first design with ${analysis.background} as canvas`);
+  L.push(`- Primary brand color: \`${analysis.primary}\``);
+  L.push(`- Accent color: \`${analysis.accent}\``);
+  L.push('');
+
+  L.push(`## 2. Color Palette & Roles\n\n### Primary`);
+  L.push(`- **Background** (\`${analysis.background}\`): Primary canvas color`);
+  L.push(`- **Surface** (\`${analysis.surface}\`): Card and panel surfaces`);
+  L.push(`- **Text Primary** (\`${analysis.text}\`): Main text content`);
+  L.push(`- **Text Secondary** (\`${analysis.textSecondary}\`): Secondary and muted text`);
+  L.push(`\n### Brand & Accent`);
+  L.push(`- **Primary** (\`${analysis.primary}\`): CTAs, links, interactive highlights`);
+  L.push(`- **Secondary** (\`${analysis.secondary}\`): Secondary actions and emphasis`);
+  L.push(`- **Accent** (\`${analysis.accent}\`): Decorative accents`);
+  L.push(`- **Border** (\`${analysis.border}\`): Dividers and borders`);
+  L.push('');
+
+  L.push(`## 3. Typography Rules\n\n### Font Family`);
+  L.push(`- **Primary**: Inter (or system sans-serif)`);
+  L.push(`- **Monospace**: JetBrains Mono`);
+  L.push('');
+  L.push(`### Hierarchy\n`);
+  L.push(`| Role | Font | Size | Weight |`);
+  L.push(`|------|------|------|--------|`);
+  L.push(`| Display Hero | Inter | 56px | 600 |`);
+  L.push(`| Section Heading | Inter | 32px | 600 |`);
+  L.push(`| Body Large | Inter | 18px | 400 |`);
+  L.push(`| Body | Inter | 16px | 400 |`);
+  L.push(`| Caption | Inter | 13px | 400 |`);
+  L.push('');
+
+  L.push(`## 4. Component Stylings\n\n### Buttons`);
+  L.push(`- Background: \`${analysis.primary}\``);
+  L.push(`- Text: \`${isDark?'#FFFFFF':'#FFFFFF'}\``);
+  L.push(`- Radius: 8px`);
+  L.push(`- Padding: 10px 16px`);
+  L.push(`\n### Cards & Containers`);
+  L.push(`- Background: \`${analysis.surface}\``);
+  L.push(`- Border: 1px solid \`${analysis.border}\``);
+  L.push(`- Radius: 12px`);
+  L.push('');
+
+  L.push(`## 5. Layout Principles\n\n### Spacing System`);
+  L.push(`- Base unit: 8px`);
+  L.push(`- Scale: 4px, 8px, 12px, 16px, 24px, 32px, 48px`);
+  L.push(`\n### Border Radius Scale`);
+  L.push(`- Small: 6px`);
+  L.push(`- Standard: 8px`);
+  L.push(`- Medium: 12px`);
+  L.push(`- Large: 16px`);
+  L.push('');
+
+  L.push(`## 6. Depth & Elevation\n`);
+  L.push(`| Level | Treatment | Use |`);
+  L.push(`|-------|-----------|-----|`);
+  L.push(`| Flat | No shadow | Background |`);
+  L.push(`| Subtle | \`0 2px 8px rgba(0,0,0,0.1)\` | Cards |`);
+  L.push(`| Standard | \`0 8px 24px rgba(0,0,0,0.15)\` | Elevated |`);
+  L.push(`| Deep | \`0 20px 40px rgba(0,0,0,0.3)\` | Modals |`);
+  L.push('');
+
+  L.push(`## 7. Do's and Don'ts\n\n### Do`);
+  L.push(`- Use \`${analysis.primary}\` as the primary brand color consistently`);
+  L.push(`- Maintain the ${isDark?'dark':'light'}-mode foundation`);
+  L.push(`- Keep the mood ${moodWords}`);
+  L.push(`\n### Don't`);
+  L.push(`- Don't mix conflicting color temperatures`);
+  L.push(`- Don't use colors outside the extracted palette`);
+  L.push(`- Don't override the established hierarchy`);
+  L.push('');
+
+  L.push(`## 8. Responsive Behavior\n\n### Breakpoints\n`);
+  L.push(`| Name | Width | Key Changes |`);
+  L.push(`|------|-------|-------------|`);
+  L.push(`| Mobile | <640px | Single column, stacked cards |`);
+  L.push(`| Tablet | 640-1024px | 2-column grids |`);
+  L.push(`| Desktop | >1024px | Full layout |`);
+  L.push('');
+
+  L.push(`## 9. Agent Prompt Guide\n\n### Quick Color Reference`);
+  L.push(`- Background: \`${analysis.background}\``);
+  L.push(`- Surface: \`${analysis.surface}\``);
+  L.push(`- Primary: \`${analysis.primary}\``);
+  L.push(`- Text: \`${analysis.text}\``);
+  L.push(`- Accent: \`${analysis.accent}\``);
+  L.push(`\n### Iteration Guide`);
+  L.push(`1. Start with \`${analysis.background}\` as canvas, overlay \`${analysis.surface}\` cards`);
+  L.push(`2. Use \`${analysis.primary}\` for primary CTAs and brand moments`);
+  L.push(`3. Text should use \`${analysis.text}\` for main, \`${analysis.textSecondary}\` for secondary`);
+  L.push(`4. Border radius 8-12px for cards and buttons`);
+  L.push(`5. Mood: ${moodWords}`);
+
+  return L.join('\n');
+}
+
 function focusUrl(){document.getElementById('promptInput').focus();document.getElementById('promptInput').placeholder='粘贴网址，例如: https://stripe.com'}
 function toggleMic(){showToast('语音功能开发中')}
 
@@ -769,6 +1011,42 @@ loadTemplates();
 
 document.getElementById('promptInput').addEventListener('keydown',e=>{
   if(e.key==='Enter'&&!e.shiftKey){e.preventDefault();handleGenerate()}
+});
+
+// Drag-and-drop for screenshots
+const promptBox=document.querySelector('.prompt-box');
+if(promptBox){
+  ['dragenter','dragover','dragleave','drop'].forEach(ev=>{
+    promptBox.addEventListener(ev,e=>{e.preventDefault();e.stopPropagation()});
+  });
+  promptBox.addEventListener('dragover',()=>{
+    promptBox.style.borderColor='var(--primary)';
+  });
+  promptBox.addEventListener('dragleave',()=>{
+    promptBox.style.borderColor='';
+  });
+  promptBox.addEventListener('drop',e=>{
+    promptBox.style.borderColor='';
+    const file=e.dataTransfer.files[0];
+    if(file&&file.type.startsWith('image/')){
+      handleFile({target:{files:[file]}});
+    }
+  });
+}
+
+// Paste screenshot from clipboard
+document.addEventListener('paste',e=>{
+  if(document.getElementById('homeView').classList.contains('active')){
+    const items=e.clipboardData?.items;
+    if(!items)return;
+    for(const item of items){
+      if(item.type.startsWith('image/')){
+        const file=item.getAsFile();
+        if(file)handleFile({target:{files:[file]}});
+        break;
+      }
+    }
+  }
 });
 </script>
 </body>
