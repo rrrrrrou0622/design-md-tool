@@ -119,10 +119,10 @@ Now analyze the screenshot and generate the DESIGN.md:`;
 
   // Try models in order of preference, fall back on overload
   const models = [
-    'gemini-2.0-flash',
     'gemini-2.5-flash',
-    'gemini-1.5-flash',
-    'gemini-1.5-pro'
+    'gemini-2.5-pro',
+    'gemini-flash-latest',
+    'gemini-pro-latest'
   ];
 
   const tryModel = (modelIdx) => {
@@ -147,14 +147,12 @@ Now analyze the screenshot and generate the DESIGN.md:`;
         try {
           const json = JSON.parse(data);
           if (json.error) {
-            // Overloaded / rate limited — try next model
             const msg = json.error.message || '';
-            if (response.statusCode === 503 || response.statusCode === 429 ||
-                msg.includes('overload') || msg.includes('high demand')) {
-              console.log(`${model} overloaded, trying next...`);
+            console.log(`${model} error (${response.statusCode}): ${msg}`);
+            // Try next model on any recoverable error
+            if (modelIdx < models.length - 1) {
               return tryModel(modelIdx + 1);
             }
-            console.error('Gemini error:', json.error);
             return res.status(500).json({ error: msg || 'Gemini API error' });
           }
           const text = json.candidates?.[0]?.content?.parts?.[0]?.text;
