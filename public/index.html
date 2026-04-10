@@ -829,10 +829,11 @@ async function analyzeImage(dataUrl){
 
       // Sort by frequency
       const sorted=[...buckets.entries()].sort((a,b)=>b[1]-a[1]);
+      const totalPixels=sorted.reduce((s,[,c])=>s+c,0);
 
       // Pick diverse colors (skip too-similar ones)
       const picked=[];
-      const MIN_DIST=50;
+      const MIN_DIST=45;
       for(const [key,count] of sorted){
         const [r,g,b]=key.split(',').map(Number);
         const tooClose=picked.some(p=>{
@@ -840,42 +841,85 @@ async function analyzeImage(dataUrl){
           return Math.sqrt(dr*dr+dg*dg+db*db)<MIN_DIST;
         });
         if(!tooClose){
-          picked.push({r,g,b,count});
-          if(picked.length>=10)break;
+          picked.push({r,g,b,count,ratio:count/totalPixels});
+          if(picked.length>=15)break;
         }
       }
 
-      // Find background (most common)
-      const bgColor=picked[0];
-      const isDark=(bgColor.r*299+bgColor.g*587+bgColor.b*114)/1000<128;
+      // Determine overall brightness: average luminance weighted by pixel count
+      let totalLum=0;
+      picked.forEach(c=>{
+        const lum=(c.r*299+c.g*587+c.b*114)/1000;
+        totalLum+=lum*c.ratio;
+      });
+      const isDark=totalLum<128;
 
-      // Classify into roles
+      // Background = the most frequent color that matches the overall brightness direction
+      // (avoids picking a colored element as background)
+      const bgCandidates=picked.filter(c=>{
+        const lum=(c.r*299+c.g*587+c.b*114)/1000;
+        return isDark?lum<80:lum>180;
+      });
+      const bgColor=bgCandidates[0]||picked[0];
+
       const toHex=(c)=>'#'+[c.r,c.g,c.b].map(x=>x.toString(16).padStart(2,'0')).join('').toUpperCase();
 
-      // Find colors by characteristics
-      const colorful=picked.filter(c=>{
+      // Score colors by (saturation * log(count)) so dominant saturated color wins,
+      // but tiny accent splashes don't become "primary"
+      const scored=picked.map(c=>{
         const max=Math.max(c.r,c.g,c.b);
         const min=Math.min(c.r,c.g,c.b);
-        return max-min>60; // saturated
-      }).sort((a,b)=>b.count-a.count);
+        const sat=max===0?0:(max-min)/max;
+        const lum=(c.r*299+c.g*587+c.b*114)/1000;
+        // Brand colors are usually mid-luminance, saturated
+        const midness=1-Math.abs(lum-128)/128;
+        const score=sat*Math.log(1+c.count)*midness;
+        return{...c,sat,lum,score};
+      });
 
-      const neutrals=picked.filter(c=>{
-        const max=Math.max(c.r,c.g,c.b);
-        const min=Math.min(c.r,c.g,c.b);
-        return max-min<=60;
-      }).sort((a,b)=>b.count-a.count);
+      // Sort candidates for primary: most saturated + reasonably frequent
+      const brandCandidates=scored.filter(c=>c.sat>0.3&&c.ratio>0.005).sort((a,b)=>b.score-a.score);
+      const primary=brandCandidates[0]||scored.sort((a,b)=>b.sat-a.sat)[0]||picked[1]||bgColor;
+
+      // Neutrals = low saturation colors, used for surfaces/borders/text
+      const neutrals=scored.filter(c=>c.sat<=0.3).sort((a,b)=>b.count-a.count);
+
+      // Surface = a neutral that's close to but slightly different from bg
+      const surface=neutrals.find(c=>{
+        const dr=c.r-bgColor.r,dg=c.g-bgColor.g,db=c.b-bgColor.b;
+        const dist=Math.sqrt(dr*dr+dg*dg+db*db);
+        return dist>10&&dist<80;
+      })||neutrals[1]||bgColor;
+
+      // Text = extremes (darkest for light bg, lightest for dark bg)
+      const textCol=isDark
+        ?neutrals.sort((a,b)=>b.lum-a.lum)[0]||{r:255,g:255,b:255}
+        :neutrals.sort((a,b)=>a.lum-b.lum)[0]||{r:17,g:17,b:17};
+      const textSecondary=isDark
+        ?neutrals.filter(c=>c.lum>100&&c.lum<200)[0]||{r:161,g:161,b:170}
+        :neutrals.filter(c=>c.lum>80&&c.lum<180)[0]||{r:113,g:113,b:122};
+
+      // Accent = second most salient brand color
+      const accent=brandCandidates[1]||brandCandidates[0]||primary;
+      const secondary=brandCandidates[2]||brandCandidates[1]||accent;
+
+      // Border = light neutral
+      const borderCol=neutrals.find(c=>{
+        const lumDiff=Math.abs(c.lum-(isDark?40:230));
+        return lumDiff<30;
+      })||neutrals[2]||{r:200,g:200,b:200};
 
       resolve({
         background:toHex(bgColor),
         isDark,
-        primary:toHex(colorful[0]||picked[1]||bgColor),
-        secondary:toHex(colorful[1]||neutrals[1]||bgColor),
-        surface:toHex(neutrals[1]||bgColor),
-        text:isDark?'#FFFFFF':'#111111',
-        textSecondary:toHex(neutrals[2]||{r:128,g:128,b:128}),
-        accent:toHex(colorful[2]||colorful[0]||picked[1]||bgColor),
-        border:toHex(neutrals[3]||{r:200,g:200,b:200}),
-        muted:toHex(neutrals[2]||{r:150,g:150,b:150}),
+        primary:toHex(primary),
+        secondary:toHex(secondary),
+        surface:toHex(surface),
+        text:toHex(textCol),
+        textSecondary:toHex(textSecondary),
+        accent:toHex(accent),
+        border:toHex(borderCol),
+        muted:toHex(textSecondary),
         allColors:picked.slice(0,8).map(c=>({value:toHex(c),count:c.count}))
       });
     };
