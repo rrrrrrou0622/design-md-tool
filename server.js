@@ -114,8 +114,39 @@ Now analyze the screenshot and generate the DESIGN.md:`;
         { inline_data: { mime_type: mimeType, data: base64Data } }
       ]
     }],
-    generationConfig: { temperature: 0.4, maxOutputTokens: 4096 }
+    generationConfig: { temperature: 0.4, maxOutputTokens: 8192 }
   });
+
+  // Fill in missing sections (6/8/9) with sensible defaults from extracted data
+  const ensureCompleteness = (md) => {
+    const hasSection = (num) => new RegExp(`^##\\s+${num}\\.`, 'm').test(md);
+    // Pull colors from section 2 for reference
+    const colorMatches = [...md.matchAll(/\*\*([^*]+)\*\*\s*\(`(#[0-9a-fA-F]+)`\)/g)];
+    const colors = colorMatches.map(m => ({ name: m[1].trim(), hex: m[2] }));
+    const primary = colors.find(c => /primary|cta|brand|accent/i.test(c.name))?.hex || colors[4]?.hex || colors[0]?.hex || '#7C5CFC';
+    const bg = colors.find(c => /background|base|canvas/i.test(c.name))?.hex || colors[0]?.hex || '#FFFFFF';
+    const text = colors.find(c => /text|foreground|heading/i.test(c.name))?.hex || colors[2]?.hex || '#111111';
+    // Pull font from section 3
+    const fontMatch = md.match(/\*\*Primary\*\*:\s*([^\n]+)/);
+    const font = fontMatch ? fontMatch[1].replace(/`/g, '').trim() : 'Inter';
+
+    let result = md;
+
+    if (!hasSection(6)) {
+      result += `\n\n## 6. Depth & Elevation\n\n| Level | Treatment | Use |\n|-------|-----------|-----|\n| Flat (Level 0) | No shadow | Page background, inline content |\n| Subtle (Level 1) | \`0 2px 4px rgba(0,0,0,0.05)\` | Card hover hints |\n| Standard (Level 2) | \`0 4px 12px rgba(0,0,0,0.1)\` | Standard cards, panels |\n| Elevated (Level 3) | \`0 12px 32px rgba(0,0,0,0.15)\` | Dropdowns, popovers |\n| Deep (Level 4) | \`0 20px 48px rgba(0,0,0,0.25)\` | Modals, overlays |\n\nShadows should remain subtle and serve to reinforce the visual hierarchy without overwhelming the clean aesthetic.\n`;
+    }
+
+    if (!hasSection(8)) {
+      result += `\n\n## 8. Responsive Behavior\n\n### Breakpoints\n\n| Name | Width | Key Changes |\n|------|-------|-------------|\n| Mobile | <640px | Single column layout, reduced heading sizes, stacked cards |\n| Tablet | 640-1024px | 2-column grids, moderate padding |\n| Desktop | 1024-1280px | Full multi-zone layout, 3-column feature grids |\n| Large Desktop | >1280px | Centered content with generous side margins |\n\n### Collapsing Strategy\n- Hero typography: scales down proportionally (e.g., 56px → 40px → 32px)\n- Navigation: horizontal links collapse to hamburger menu on mobile\n- Multi-column grids: 3-col → 2-col → 1-col stacked\n- Section spacing: 64px+ desktop → 32px mobile\n`;
+    }
+
+    if (!hasSection(9)) {
+      const refs = colors.slice(0, 6).map(c => `- ${c.name}: \`${c.hex}\``).join('\n');
+      result += `\n\n## 9. Agent Prompt Guide\n\n### Quick Color Reference\n${refs || `- Primary: \`${primary}\`\n- Background: \`${bg}\`\n- Text: \`${text}\``}\n\n### Iteration Guide\n1. Use \`${font}\` consistently for all text elements, with appropriate weights from the typography hierarchy.\n2. Primary brand color is \`${primary}\` — use it for CTAs, active states, and key interactive elements.\n3. Background canvas is \`${bg}\`; place cards and panels on this foundation.\n4. Maintain the established spacing scale; do not introduce arbitrary values.\n5. Keep border-radius values within the defined scale; consistency is more important than variety.\n6. When in doubt, defer to the "Do's and Don'ts" section to stay on-brand.\n\n### Example Prompt\n"Build a hero section following DESIGN.md: ${bg} background, ${font} headline at the largest size from the hierarchy, ${primary} CTA button using the Standard radius and shadow Level 2."\n`;
+    }
+
+    return result;
+  };
 
   // Try models in order of preference, fall back on overload
   const models = [
@@ -162,7 +193,9 @@ Now analyze the screenshot and generate the DESIGN.md:`;
           }
           // Strip markdown code fences if present
           const cleaned = text.replace(/^```markdown?\n?/i, '').replace(/\n?```\s*$/i, '').trim();
-          res.json({ content: cleaned, model });
+          // Fill in any missing sections with sensible defaults
+          const complete = ensureCompleteness(cleaned);
+          res.json({ content: complete, model });
         } catch (e) {
           console.error('Parse error:', e, data.substring(0, 500));
           tryModel(modelIdx + 1);
