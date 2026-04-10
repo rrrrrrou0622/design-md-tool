@@ -128,7 +128,12 @@
       .sec-card[data-sec="9"]{width:440px;left:24px;top:640px}
     }
 
-    .canvas-chat{position:fixed;bottom:20px;left:20px;width:380px;max-width:calc(100vw - 40px);background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:12px 14px;display:flex;flex-direction:column;gap:8px;box-shadow:0 20px 40px -10px rgba(124,92,252,0.35),0 0 0 1px rgba(167,139,250,0.1);z-index:50}
+    .canvas-chat{position:fixed;bottom:20px;right:20px;width:340px;max-width:calc(100vw - 40px);background:var(--surface);border:1px solid var(--border);border-radius:14px;padding:12px 14px;display:flex;flex-direction:column;gap:8px;box-shadow:0 20px 40px -10px rgba(124,92,252,0.4),0 0 0 1px rgba(167,139,250,0.15);z-index:50;transition:all .25s}
+    .canvas-chat.collapsed{width:auto;padding:10px 14px;cursor:pointer}
+    .canvas-chat.collapsed .canvas-chat-input,.canvas-chat.collapsed .canvas-chat-kbd{display:none}
+    .canvas-chat.collapsed .canvas-chat-head{gap:8px}
+    .canvas-chat-toggle{color:var(--muted);cursor:pointer;padding:2px;display:flex;transition:transform .2s}
+    .canvas-chat.collapsed .canvas-chat-toggle{transform:rotate(180deg)}
     .canvas-chat-head{display:flex;align-items:center;gap:6px}
     .canvas-chat-head svg{color:var(--primary)}
     .canvas-chat-title{font-size:11px;font-weight:600;color:var(--text);flex:1}
@@ -227,9 +232,11 @@
       .sec-card{position:static!important;width:100%!important;left:auto!important;top:auto!important;padding:14px;gap:10px}
       .sec-title{font-size:12px}
       .sec-desc{font-size:11px}
-      .canvas-chat{position:fixed;bottom:0;left:0;width:100%;max-width:none;border-radius:0;border-left:none;border-right:none;border-bottom:none;box-shadow:0 -8px 24px rgba(0,0,0,0.5);padding:10px 16px}
+      .canvas-chat{position:fixed;bottom:0;left:0;right:auto;width:100%;max-width:none;border-radius:0;border-left:none;border-right:none;border-bottom:none;box-shadow:0 -8px 24px rgba(0,0,0,0.5);padding:10px 16px}
+      .canvas-chat.collapsed{width:100%;padding:10px 16px}
       .canvas-chat-title{display:none}
       .canvas-chat-kbd{display:none}
+      .canvas-chat-toggle{display:none}
     }
   </style>
 </head>
@@ -332,11 +339,12 @@
           </div>
         </div>
       </div>
-      <div class="canvas-chat">
-        <div class="canvas-chat-head">
+      <div class="canvas-chat" id="canvasChat">
+        <div class="canvas-chat-head" onclick="toggleChat()">
           <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="m12 3-1.9 5.8a2 2 0 0 1-1.3 1.3L3 12l5.8 1.9a2 2 0 0 1 1.3 1.3L12 21l1.9-5.8a2 2 0 0 1 1.3-1.3L21 12l-5.8-1.9a2 2 0 0 1-1.3-1.3L12 3Z"/></svg>
           <span class="canvas-chat-title">告诉 AI 你想改什么</span>
           <div class="canvas-chat-kbd">⌘ Enter</div>
+          <div class="canvas-chat-toggle"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="6 9 12 15 18 9"/></svg></div>
         </div>
         <input type="text" class="canvas-chat-input" id="chatInput" placeholder='"把主色改成深蓝"  "圆角改成12px"  "加一个阴影段落"'>
       </div>
@@ -681,12 +689,20 @@ function renderAgentGuide(sec){
   const guides=sec.lines.filter(l=>l.match(/^\d+\.\s/)).slice(0,4);
   let html='';
   if(refs.length){
-    html+=`<div class="agent-refs">${refs.map(r=>`<div><span style="color:var(--primary)">→</span> ${r.name}: <code>${r.value}</code></div>`).join('')}</div>`;
+    html+=`<div class="agent-refs">${refs.map(r=>`<div><span style="color:var(--primary)">→</span> ${r.name.replace(/\*\*/g,'')}: <code>${r.value}</code></div>`).join('')}</div>`;
   }
   if(guides.length){
-    html+=`<div class="agent-code">${guides.map(g=>`<div>${g}</div>`).join('')}</div>`;
+    html+=`<div class="agent-code">${guides.map(g=>`<div>${g.replace(/\*\*/g,'')}</div>`).join('')}</div>`;
   }
   return html||'<div class="sec-desc">暂无指南</div>';
+}
+
+function toggleChat(){
+  document.getElementById('canvasChat').classList.toggle('collapsed');
+  // Focus input when expanding
+  if(!document.getElementById('canvasChat').classList.contains('collapsed')){
+    setTimeout(()=>document.getElementById('chatInput').focus(),200);
+  }
 }
 
 function isColorLight(hex){
