@@ -10,6 +10,113 @@ const PORT = process.env.PORT || 3100;
 app.use(express.json({ limit: '15mb' }));
 app.use(express.static(path.join(__dirname, 'public')));
 
+// ─── Gemini: generate full HTML page from DESIGN.md ──────────
+app.post('/api/generate-page', async (req, res) => {
+  const { designMd, pageType, customPrompt } = req.body;
+  if (!designMd) return res.status(400).json({ error: 'designMd required' });
+
+  const apiKey = process.env.GEMINI_API_KEY;
+  if (!apiKey) return res.status(500).json({ error: 'GEMINI_API_KEY not configured' });
+
+  const PAGE_TEMPLATES = {
+    dashboard: {
+      name: 'Dashboard 仪表盘',
+      brief: 'A data-rich admin dashboard with: top navigation bar (logo + nav links + user avatar), left sidebar with 5-6 menu items, main content area with 4 KPI metric cards in a row (number + label + trend arrow), a large chart section (use inline SVG for a line or bar chart), a recent activity table (5 rows), and a notifications panel on the right.'
+    },
+    landing: {
+      name: '落地页',
+      brief: 'A marketing landing page with: sticky nav, large hero (headline + subtitle + CTA button + hero image placeholder), 3-column feature section (icon + title + desc), testimonial quote, pricing cards (3 tiers), FAQ accordion, and footer.'
+    },
+    product: {
+      name: '商品详情页',
+      brief: 'An e-commerce product detail page with: breadcrumb, left side large product image gallery + thumbnails, right side product info (title, price, rating, color options, size options, quantity selector, add-to-cart button, description tabs), related products grid below.'
+    },
+    settings: {
+      name: '设置页',
+      brief: 'An app settings page with: left sidebar menu (Profile, Notifications, Privacy, Billing, API), main form area with sections, toggle switches, input fields, avatar upload, and save button.'
+    },
+    pricing: {
+      name: '定价页',
+      brief: 'A pricing page with: headline, monthly/yearly toggle, 3-4 pricing tier cards (name, price, feature list with checkmarks, CTA button), feature comparison table below, FAQ section.'
+    }
+  };
+
+  const template = PAGE_TEMPLATES[pageType] || PAGE_TEMPLATES.dashboard;
+
+  const prompt = `You are an expert frontend engineer. Generate a complete, production-quality HTML page that STRICTLY follows the design system defined in this DESIGN.md file.
+
+# DESIGN SYSTEM (DESIGN.md)
+
+${designMd}
+
+# PAGE TO GENERATE
+
+${template.name}: ${template.brief}
+
+${customPrompt ? `User's additional requirements: ${customPrompt}\n` : ''}
+
+# STRICT REQUIREMENTS
+
+1. Output a SINGLE complete HTML file — no explanation, no markdown code fences
+2. Include all CSS inline in a <style> tag in the <head>
+3. Use EXACT colors, fonts, spacing, radius, and shadows from the DESIGN.md — do not invent new values
+4. Load Google Fonts via @import if the font is a common web font (Inter, Geist, etc.)
+5. Use semantic HTML5 (header, nav, main, section, article, aside, footer)
+6. Make it responsive (mobile + desktop) using CSS media queries at 768px
+7. Use inline SVG for icons (use Lucide-style 24x24 stroke icons)
+8. Use inline SVG for any charts/graphs
+9. Use real-looking placeholder content in Chinese (中文文案), not Lorem ipsum
+10. For images, use placeholder colored div blocks or <img src="https://picsum.photos/..." />
+11. Every interactive element must have :hover states
+12. Follow the "Do's and Don'ts" from the DESIGN.md exactly
+13. Apply the Depth & Elevation rules for all cards/modals
+14. Start your output with <!DOCTYPE html> and end with </html>
+
+Generate the complete HTML now:`;
+
+  const payload = JSON.stringify({
+    contents: [{ parts: [{ text: prompt }] }],
+    generationConfig: { temperature: 0.5, maxOutputTokens: 16384 }
+  });
+
+  const models = ['gemini-2.5-flash', 'gemini-2.5-pro', 'gemini-flash-latest'];
+
+  const tryModel = (idx) => {
+    if (idx >= models.length) return res.status(503).json({ error: 'All models unavailable' });
+    const model = models[idx];
+    const options = {
+      hostname: 'generativelanguage.googleapis.com',
+      path: `/v1beta/models/${model}:generateContent?key=${apiKey}`,
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'Content-Length': Buffer.byteLength(payload) }
+    };
+    const r = https.request(options, (resp) => {
+      let data = '';
+      resp.on('data', c => data += c);
+      resp.on('end', () => {
+        try {
+          const json = JSON.parse(data);
+          if (json.error) {
+            console.log(`${model} error: ${json.error.message}`);
+            return tryModel(idx + 1);
+          }
+          const text = json.candidates?.[0]?.content?.parts?.[0]?.text;
+          if (!text) return tryModel(idx + 1);
+          const cleaned = text.replace(/^```html?\n?/i, '').replace(/\n?```\s*$/i, '').trim();
+          res.json({ html: cleaned, model, pageType });
+        } catch (e) {
+          tryModel(idx + 1);
+        }
+      });
+    });
+    r.on('error', () => tryModel(idx + 1));
+    r.write(payload);
+    r.end();
+  };
+
+  tryModel(0);
+});
+
 // ─── Gemini Vision: analyze screenshot into DESIGN.md ──────────
 app.post('/api/analyze-image', async (req, res) => {
   const { imageBase64, userPrompt } = req.body;

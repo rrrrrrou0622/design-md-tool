@@ -191,6 +191,40 @@
     .toast{position:fixed;bottom:20px;left:50%;transform:translateX(-50%) translateY(16px);background:var(--surface2);color:var(--text);padding:10px 18px;border-radius:10px;font-size:12px;border:1px solid var(--border);opacity:0;transition:all .25s;pointer-events:none;z-index:1000;box-shadow:0 8px 24px rgba(0,0,0,0.4)}
     .toast.show{opacity:1;transform:translateX(-50%) translateY(0)}
 
+    /* Generate menu dropdown */
+    .gen-menu{position:absolute;top:calc(100% + 6px);right:0;width:260px;background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:6px;display:none;flex-direction:column;gap:2px;box-shadow:0 20px 40px rgba(0,0,0,0.5);z-index:100}
+    .gen-menu.open{display:flex}
+    .gen-menu-item{display:flex;align-items:center;gap:10px;padding:10px;border-radius:8px;cursor:pointer;transition:background .15s}
+    .gen-menu-item:hover{background:var(--surface3)}
+    .gen-icon{width:32px;height:32px;border-radius:8px;display:flex;align-items:center;justify-content:center;flex-shrink:0}
+    .gen-title{font-size:13px;font-weight:600;color:var(--text)}
+    .gen-desc{font-size:10px;color:var(--muted);margin-top:1px}
+    .gen-menu-divider{height:1px;background:var(--border);margin:4px 0}
+
+    /* Preview drawer */
+    .preview-drawer{position:fixed;top:0;right:0;width:min(1200px,90vw);height:100vh;background:var(--bg);border-left:1px solid var(--border);box-shadow:-20px 0 60px rgba(0,0,0,0.6);z-index:200;display:flex;flex-direction:column;transform:translateX(100%);transition:transform .3s cubic-bezier(.4,0,.2,1)}
+    .preview-drawer.open{transform:translateX(0)}
+    .preview-overlay{position:fixed;inset:0;background:rgba(0,0,0,0.5);backdrop-filter:blur(4px);opacity:0;pointer-events:none;transition:opacity .3s;z-index:199}
+    .preview-overlay.show{opacity:1;pointer-events:auto}
+    .preview-header{display:flex;align-items:center;gap:12px;padding:0 20px;height:56px;border-bottom:1px solid var(--border);flex-shrink:0}
+    .preview-title{font-size:14px;font-weight:600;color:var(--text);display:flex;align-items:center;gap:8px}
+    .preview-title .dot{width:8px;height:8px;border-radius:50%;background:var(--primary)}
+    .preview-device{display:flex;gap:2px;background:var(--surface);border-radius:8px;padding:3px;border:1px solid var(--border)}
+    .preview-device button{padding:6px 10px;border-radius:6px;font-size:11px;color:var(--muted);display:flex;align-items:center;gap:4px}
+    .preview-device button.active{background:var(--primary-dim);color:var(--primary)}
+    .preview-frame-wrap{flex:1;overflow:auto;background:repeating-conic-gradient(var(--surface) 0% 25%,transparent 0% 50%) 50% / 20px 20px;display:flex;align-items:flex-start;justify-content:center;padding:20px;transition:padding .3s}
+    .preview-frame-wrap.mobile{padding:40px}
+    .preview-frame{border:none;background:#fff;box-shadow:0 20px 60px rgba(0,0,0,0.5);border-radius:8px;width:100%;max-width:100%;height:calc(100vh - 116px);transition:all .3s}
+    .preview-frame-wrap.mobile .preview-frame{max-width:390px;height:844px;border-radius:24px}
+    .preview-loading{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:12px;color:var(--text3);font-size:13px}
+    .preview-loading .spinner{width:32px;height:32px;border:3px solid var(--border);border-top-color:var(--primary);border-radius:50%;animation:spin 0.8s linear infinite}
+    @media (max-width:768px){
+      .gen-menu{right:-8px;width:240px}
+      .preview-drawer{width:100vw}
+      .preview-frame-wrap{padding:12px}
+      .preview-frame-wrap.mobile{padding:24px}
+    }
+
     @media (max-width:768px){
       .nav{padding:0 16px;height:52px;gap:10px}
       .logo-text{font-size:15px}
@@ -330,6 +364,23 @@
           <span style="color:var(--muted3)">/</span>
           <div class="bc-current"><span class="bc-dot" id="bcDot"></span><span id="bcName">—</span></div>
         </div>
+        <div style="flex:1"></div>
+        <div class="gen-menu-wrap" style="position:relative">
+          <button class="nav-btn" style="background:var(--primary2);color:#fff;border-color:transparent;font-weight:600" onclick="toggleGenMenu(event)">
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="m12 3-1.9 5.8a2 2 0 0 1-1.3 1.3L3 12l5.8 1.9a2 2 0 0 1 1.3 1.3L12 21l1.9-5.8a2 2 0 0 1 1.3-1.3L21 12l-5.8-1.9a2 2 0 0 1-1.3-1.3L12 3Z"/></svg>
+            <span>生成页面</span>
+            <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="6 9 12 15 18 9"/></svg>
+          </button>
+          <div class="gen-menu" id="genMenu">
+            <div class="gen-menu-item" onclick="generatePage('dashboard')"><div class="gen-icon" style="background:rgba(124,92,252,0.15);color:var(--primary)"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="9"/><rect x="14" y="3" width="7" height="5"/><rect x="14" y="12" width="7" height="9"/><rect x="3" y="16" width="7" height="5"/></svg></div><div><div class="gen-title">Dashboard 仪表盘</div><div class="gen-desc">KPI 卡片 · 图表 · 数据表</div></div></div>
+            <div class="gen-menu-item" onclick="generatePage('landing')"><div class="gen-icon" style="background:rgba(92,170,252,0.15);color:var(--blue)"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 18V6a2 2 0 0 0-2-2H4a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2Z"/><path d="M2 9h20"/></svg></div><div><div class="gen-title">落地页</div><div class="gen-desc">Hero · 特性 · 定价 · FAQ</div></div></div>
+            <div class="gen-menu-item" onclick="generatePage('product')"><div class="gen-icon" style="background:rgba(34,197,94,0.15);color:var(--green)"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 2 3 6v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V6l-3-4Z"/><path d="M3 6h18"/><path d="M16 10a4 4 0 0 1-8 0"/></svg></div><div><div class="gen-title">商品详情页</div><div class="gen-desc">图册 · 选项 · 加购</div></div></div>
+            <div class="gen-menu-item" onclick="generatePage('settings')"><div class="gen-icon" style="background:rgba(245,158,11,0.15);color:var(--amber)"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.39a2 2 0 0 0-.73-2.73l-.15-.08a2 2 0 0 1-1-1.74v-.5a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2Z"/><circle cx="12" cy="12" r="3"/></svg></div><div><div class="gen-title">设置页</div><div class="gen-desc">表单 · 开关 · 账户</div></div></div>
+            <div class="gen-menu-item" onclick="generatePage('pricing')"><div class="gen-icon" style="background:rgba(236,72,153,0.15);color:var(--pink)"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20.59 13.41 13.42 20.58a2 2 0 0 1-2.83 0L2 12V2h10l8.59 8.59a2 2 0 0 1 0 2.82z"/><line x1="7" y1="7" x2="7.01" y2="7"/></svg></div><div><div class="gen-title">定价页</div><div class="gen-desc">套餐卡片 · 对比表</div></div></div>
+            <div class="gen-menu-divider"></div>
+            <div class="gen-menu-item" onclick="downloadMd()"><div class="gen-icon" style="background:rgba(161,161,170,0.15);color:var(--text3)"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7,10 12,15 17,10"/><line x1="12" y1="15" x2="12" y2="3"/></svg></div><div><div class="gen-title">下载 DESIGN.md</div><div class="gen-desc">原始 Markdown 文件</div></div></div>
+          </div>
+        </div>
       </div>
       <div class="editor-canvas">
         <div class="canvas-inner" id="canvasInner">
@@ -350,6 +401,44 @@
       </div>
     </div>
 
+  </div>
+
+  <!-- Preview Drawer -->
+  <div class="preview-overlay" id="previewOverlay" onclick="closePreview()"></div>
+  <div class="preview-drawer" id="previewDrawer">
+    <div class="preview-header">
+      <div class="preview-title"><span class="dot"></span><span id="previewTitle">Dashboard 仪表盘</span></div>
+      <div style="flex:1"></div>
+      <div class="preview-device">
+        <button class="active" id="devDesktop" onclick="setDevice('desktop')">
+          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="3" width="20" height="14" rx="2"/><line x1="8" y1="21" x2="16" y2="21"/><line x1="12" y1="17" x2="12" y2="21"/></svg>
+          桌面
+        </button>
+        <button id="devMobile" onclick="setDevice('mobile')">
+          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="5" y="2" width="14" height="20" rx="2"/></svg>
+          移动
+        </button>
+      </div>
+      <button class="nav-btn" onclick="downloadHtml()">
+        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7,10 12,15 17,10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+        下载 HTML
+      </button>
+      <button class="nav-btn" onclick="copyHtml()">
+        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
+        复制
+      </button>
+      <button class="nav-btn" onclick="closePreview()" style="padding:0 10px">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+      </button>
+    </div>
+    <div class="preview-frame-wrap" id="previewFrameWrap">
+      <div class="preview-loading" id="previewLoading">
+        <div class="spinner"></div>
+        <div>Gemini 正在生成页面...</div>
+        <div style="font-size:11px;color:var(--muted)">通常需要 10-30 秒</div>
+      </div>
+      <iframe class="preview-frame" id="previewFrame" style="display:none"></iframe>
+    </div>
   </div>
 
   <div class="toast" id="toast"></div>
@@ -699,10 +788,99 @@ function renderAgentGuide(sec){
 
 function toggleChat(){
   document.getElementById('canvasChat').classList.toggle('collapsed');
-  // Focus input when expanding
   if(!document.getElementById('canvasChat').classList.contains('collapsed')){
     setTimeout(()=>document.getElementById('chatInput').focus(),200);
   }
+}
+
+// ─── Generate page menu ───────────────────────────
+function toggleGenMenu(e){
+  e?.stopPropagation();
+  document.getElementById('genMenu').classList.toggle('open');
+}
+document.addEventListener('click',e=>{
+  if(!e.target.closest('.gen-menu-wrap')){
+    document.getElementById('genMenu')?.classList.remove('open');
+  }
+});
+
+let currentGeneratedHtml='';
+const PAGE_NAMES={dashboard:'Dashboard 仪表盘',landing:'落地页',product:'商品详情页',settings:'设置页',pricing:'定价页'};
+
+async function generatePage(type){
+  document.getElementById('genMenu').classList.remove('open');
+  const md=document.getElementById('rawMd').value;
+  if(!md){showToast('请先加载一个 DESIGN.md');return}
+
+  // Open drawer with loading state
+  document.getElementById('previewTitle').textContent=PAGE_NAMES[type]||'生成中';
+  document.getElementById('previewFrame').style.display='none';
+  document.getElementById('previewLoading').style.display='flex';
+  document.getElementById('previewOverlay').classList.add('show');
+  document.getElementById('previewDrawer').classList.add('open');
+
+  try{
+    const r=await fetch('/api/generate-page',{
+      method:'POST',
+      headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({designMd:md,pageType:type})
+    });
+    if(!r.ok){
+      const err=await r.json();
+      throw new Error(err.error||'生成失败');
+    }
+    const{html}=await r.json();
+    currentGeneratedHtml=html;
+
+    // Render into iframe using srcdoc
+    const iframe=document.getElementById('previewFrame');
+    iframe.srcdoc=html;
+    iframe.onload=()=>{
+      document.getElementById('previewLoading').style.display='none';
+      iframe.style.display='block';
+    };
+    showToast('生成成功！');
+  }catch(e){
+    document.getElementById('previewLoading').innerHTML=`<div style="color:var(--red);font-size:13px">生成失败</div><div style="font-size:11px;color:var(--muted);max-width:400px;text-align:center">${e.message}</div><button class="nav-btn" onclick="generatePage('${type}')" style="margin-top:12px">重试</button>`;
+  }
+}
+
+function closePreview(){
+  document.getElementById('previewDrawer').classList.remove('open');
+  document.getElementById('previewOverlay').classList.remove('show');
+}
+
+function setDevice(device){
+  const wrap=document.getElementById('previewFrameWrap');
+  wrap.classList.toggle('mobile',device==='mobile');
+  document.getElementById('devDesktop').classList.toggle('active',device==='desktop');
+  document.getElementById('devMobile').classList.toggle('active',device==='mobile');
+}
+
+function downloadHtml(){
+  if(!currentGeneratedHtml){showToast('没有可下载的内容');return}
+  const a=document.createElement('a');
+  a.href=URL.createObjectURL(new Blob([currentGeneratedHtml],{type:'text/html'}));
+  a.download='page.html';
+  a.click();
+  showToast('已下载');
+}
+
+function copyHtml(){
+  if(!currentGeneratedHtml){showToast('没有可复制的内容');return}
+  navigator.clipboard.writeText(currentGeneratedHtml);
+  showToast('HTML 已复制');
+}
+
+function downloadMd(){
+  const md=document.getElementById('rawMd').value;
+  if(!md){showToast('没有 DESIGN.md');return}
+  const a=document.createElement('a');
+  a.href=URL.createObjectURL(new Blob([md],{type:'text/markdown'}));
+  a.download='DESIGN.md';
+  a.click();
+  showToast('已下载 DESIGN.md');
+  document.getElementById('genMenu').classList.remove('open');
 }
 
 function isColorLight(hex){
