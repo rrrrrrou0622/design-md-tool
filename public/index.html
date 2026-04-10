@@ -662,18 +662,25 @@ function isColorLight(hex){
 async function handleGenerate(){
   const val=document.getElementById('promptInput').value.trim();
 
-  // 1. If image uploaded, analyze it
+  // 1. If image uploaded, send to Gemini Vision
   if(uploadedImage){
     const btn=document.getElementById('genBtn');
     btn.disabled=true;btn.classList.add('loading');
-    showToast('分析截图中...');
+    showToast('Gemini 正在分析截图...');
     try{
-      const analysis=await analyzeImage(uploadedImage);
-      const md=generateMdFromImage(analysis,val);
-      document.getElementById('rawMd').value=md;
+      const r=await fetch('/api/analyze-image',{
+        method:'POST',
+        headers:{'Content-Type':'application/json'},
+        body:JSON.stringify({imageBase64:uploadedImage,userPrompt:val})
+      });
+      if(!r.ok)throw new Error((await r.json()).error||'分析失败');
+      const{content}=await r.json();
+      document.getElementById('rawMd').value=content;
       document.getElementById('bcName').textContent='截图分析';
-      document.getElementById('bcDot').style.background=analysis.primary;
-      currentDesign=parseDesignMd(md);
+      // Extract first hex color for breadcrumb dot
+      const firstHex=content.match(/#[0-9a-fA-F]{6}/)?.[0]||'#7C5CFC';
+      document.getElementById('bcDot').style.background=firstHex;
+      currentDesign=parseDesignMd(content);
       renderEditor();
       showView('editor');
       clearImage();

@@ -2,12 +2,161 @@ const express = require('express');
 const path = require('path');
 const fs = require('fs');
 const { execSync } = require('child_process');
+const https = require('https');
 
 const app = express();
 const PORT = process.env.PORT || 3100;
 
-app.use(express.json({ limit: '5mb' }));
+app.use(express.json({ limit: '15mb' }));
 app.use(express.static(path.join(__dirname, 'public')));
+
+// ─── Gemini Vision: analyze screenshot into DESIGN.md ──────────
+app.post('/api/analyze-image', async (req, res) => {
+  const { imageBase64, userPrompt } = req.body;
+  if (!imageBase64) return res.status(400).json({ error: 'Image required' });
+
+  const apiKey = process.env.GEMINI_API_KEY;
+  if (!apiKey) return res.status(500).json({ error: 'GEMINI_API_KEY not configured' });
+
+  const base64Data = imageBase64.replace(/^data:image\/\w+;base64,/, '');
+  const mimeType = imageBase64.match(/^data:(image\/\w+);base64,/)?.[1] || 'image/png';
+
+  const prompt = `You are a design systems expert. Analyze this UI screenshot and generate a complete DESIGN.md file following Google Stitch's format.
+
+${userPrompt ? `User intent: ${userPrompt}\n\n` : ''}IMPORTANT rules:
+- Use DESCRIPTIVE language, not raw CSS values. Say "pill-shaped" not "border-radius: 999px".
+- For colors, include descriptive name + exact hex + functional role.
+- Output ONLY the markdown content, no code fences, no explanation.
+- Must have exactly 9 sections numbered 1-9.
+
+Required format:
+
+# Design System Inspiration from Screenshot
+
+## 1. Visual Theme & Atmosphere
+(2-3 paragraphs describing mood, style, brand feel)
+
+**Key Characteristics:**
+- (bullet points about defining traits)
+
+## 2. Color Palette & Roles
+
+### Primary
+- **Color Name** (\`#HEX\`): Role and usage description
+(list 6-10 colors grouped by role)
+
+## 3. Typography Rules
+
+### Font Family
+- **Primary**: Font name
+- **Secondary**: Font name
+- **Monospace**: Font name
+
+### Hierarchy
+| Role | Font | Size | Weight | Notes |
+|------|------|------|--------|-------|
+(5-8 rows)
+
+## 4. Component Stylings
+
+### Buttons
+- Background: \`#HEX\`
+- Text: \`#HEX\`
+- Radius: Xpx
+(+ Cards, Inputs, Badges sections)
+
+## 5. Layout Principles
+
+### Spacing System
+- Base unit: Xpx
+- Scale: (list values)
+
+### Border Radius Scale
+- Micro/Standard/Comfortable/Relaxed/Large values
+
+## 6. Depth & Elevation
+
+| Level | Treatment | Use |
+|-------|-----------|-----|
+(4-5 rows describing shadow levels)
+
+## 7. Do's and Don'ts
+
+### Do
+- (3-5 bullet points)
+
+### Don't
+- (3-5 bullet points)
+
+## 8. Responsive Behavior
+
+### Breakpoints
+| Name | Width | Key Changes |
+|------|-------|-------------|
+| Mobile | <640px | ... |
+| Tablet | 640-1024px | ... |
+| Desktop | >1024px | ... |
+
+## 9. Agent Prompt Guide
+
+### Quick Color Reference
+- (list 6-8 key colors by role)
+
+### Iteration Guide
+1. (numbered steps)
+
+Now analyze the screenshot and generate the DESIGN.md:`;
+
+  const payload = JSON.stringify({
+    contents: [{
+      parts: [
+        { text: prompt },
+        { inline_data: { mime_type: mimeType, data: base64Data } }
+      ]
+    }],
+    generationConfig: { temperature: 0.4, maxOutputTokens: 4096 }
+  });
+
+  const options = {
+    hostname: 'generativelanguage.googleapis.com',
+    path: `/v1beta/models/gemini-2.5-flash:generateContent?key=${apiKey}`,
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'Content-Length': Buffer.byteLength(payload)
+    }
+  };
+
+  const request = https.request(options, (response) => {
+    let data = '';
+    response.on('data', chunk => data += chunk);
+    response.on('end', () => {
+      try {
+        const json = JSON.parse(data);
+        if (json.error) {
+          console.error('Gemini error:', json.error);
+          return res.status(500).json({ error: json.error.message || 'Gemini API error' });
+        }
+        const text = json.candidates?.[0]?.content?.parts?.[0]?.text;
+        if (!text) return res.status(500).json({ error: 'No content in response' });
+        // Strip markdown code fences if present
+        const cleaned = text.replace(/^```markdown?\n?/i, '').replace(/\n?```\s*$/i, '').trim();
+        res.json({ content: cleaned });
+      } catch (e) {
+        console.error('Parse error:', e, data.substring(0, 500));
+        res.status(500).json({ error: 'Failed to parse Gemini response' });
+      }
+    });
+  });
+
+  request.on('error', (err) => {
+    console.error('Request error:', err);
+    res.status(500).json({ error: err.message });
+  });
+
+  request.write(payload);
+  request.end();
+});
 
 // Template catalog
 const TEMPLATES_DIR = path.join(__dirname, 'templates');
