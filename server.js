@@ -43,52 +43,52 @@ app.post('/api/generate-page', async (req, res) => {
 
   const template = PAGE_TEMPLATES[pageType] || PAGE_TEMPLATES.dashboard;
 
-  const prompt = `You are an expert frontend engineer. Generate a complete, production-quality HTML page that STRICTLY follows the design system defined in this DESIGN.md file.
+  // Trim DESIGN.md to key sections only (keep under 4000 chars)
+  const trimmedMd = designMd.length > 4000
+    ? designMd.substring(0, 4000) + '\n\n(truncated for brevity)'
+    : designMd;
 
-# DESIGN SYSTEM (DESIGN.md)
+  const prompt = `Generate a complete HTML page following this design system.
 
-${designMd}
+DESIGN SYSTEM:
+${trimmedMd}
 
-# PAGE TO GENERATE
+PAGE: ${template.name} — ${template.brief}
+${customPrompt ? `Extra: ${customPrompt}` : ''}
 
-${template.name}: ${template.brief}
-
-${customPrompt ? `User's additional requirements: ${customPrompt}\n` : ''}
-
-# STRICT REQUIREMENTS
-
-1. Output a SINGLE complete HTML file — no explanation, no markdown code fences
-2. Include all CSS inline in a <style> tag in the <head>
-3. Use EXACT colors, fonts, spacing, radius, and shadows from the DESIGN.md — do not invent new values
-4. Load Google Fonts via @import if the font is a common web font (Inter, Geist, etc.)
-5. Use semantic HTML5 (header, nav, main, section, article, aside, footer)
-6. Make it responsive (mobile + desktop) using CSS media queries at 768px
-7. Use inline SVG for icons (use Lucide-style 24x24 stroke icons)
-8. Use inline SVG for any charts/graphs
-9. Use real-looking placeholder content in Chinese (中文文案), not Lorem ipsum
-10. For images, use placeholder colored div blocks or <img src="https://picsum.photos/..." />
-11. Every interactive element must have :hover states
-12. Follow the "Do's and Don'ts" from the DESIGN.md exactly
-13. Apply the Depth & Elevation rules for all cards/modals
-14. Start your output with <!DOCTYPE html> and end with </html>
-
-Generate the complete HTML now:`;
+RULES:
+- Single HTML file, all CSS in <style>, start with <!DOCTYPE html>
+- Use EXACT colors/fonts/radius/shadows from the design system
+- Load Google Fonts via @import if needed
+- Responsive (media query at 768px)
+- Inline SVG for icons and charts
+- Chinese placeholder content (中文)
+- Images: use colored div or picsum.photos
+- Hover states on interactive elements
+- Follow Do's/Don'ts from design system
+- NO explanation, NO code fences, ONLY the HTML`;
 
   const payload = JSON.stringify({
     contents: [{ parts: [{ text: prompt }] }],
     generationConfig: { temperature: 0.5, maxOutputTokens: 16384 }
   });
 
-  const models = ['gemini-2.5-flash', 'gemini-2.5-pro', 'gemini-flash-latest'];
+  const models = ['gemini-2.5-flash', 'gemini-2.5-pro'];
 
+  let lastError = '';
   const tryModel = (idx) => {
-    if (idx >= models.length) return res.status(503).json({ error: 'All models unavailable' });
+    if (idx >= models.length) {
+      console.error('All page-gen models failed. Last error:', lastError);
+      return res.status(503).json({ error: lastError || 'All models unavailable, please try again' });
+    }
     const model = models[idx];
+    console.log(`[generate-page] Trying ${model} for ${pageType}...`);
     const options = {
       hostname: 'generativelanguage.googleapis.com',
       path: `/v1beta/models/${model}:generateContent?key=${apiKey}`,
       method: 'POST',
-      headers: { 'Content-Type': 'application/json', 'Content-Length': Buffer.byteLength(payload) }
+      headers: { 'Content-Type': 'application/json', 'Content-Length': Buffer.byteLength(payload) },
+      timeout: 120000
     };
     const r = https.request(options, (resp) => {
       let data = '';
@@ -97,19 +97,37 @@ Generate the complete HTML now:`;
         try {
           const json = JSON.parse(data);
           if (json.error) {
-            console.log(`${model} error: ${json.error.message}`);
+            lastError = json.error.message || 'Unknown error';
+            console.log(`[generate-page] ${model} error (${resp.statusCode}): ${lastError}`);
             return tryModel(idx + 1);
           }
           const text = json.candidates?.[0]?.content?.parts?.[0]?.text;
-          if (!text) return tryModel(idx + 1);
+          if (!text) {
+            const reason = json.candidates?.[0]?.finishReason || 'empty';
+            lastError = `${model}: empty response (${reason})`;
+            console.log(`[generate-page] ${lastError}`);
+            return tryModel(idx + 1);
+          }
+          console.log(`[generate-page] ${model} success, ${text.length} chars`);
           const cleaned = text.replace(/^```html?\n?/i, '').replace(/\n?```\s*$/i, '').trim();
           res.json({ html: cleaned, model, pageType });
         } catch (e) {
+          lastError = `Parse error: ${e.message}`;
+          console.log(`[generate-page] ${lastError}`);
           tryModel(idx + 1);
         }
       });
     });
-    r.on('error', () => tryModel(idx + 1));
+    r.on('error', (err) => {
+      lastError = err.message;
+      console.log(`[generate-page] ${model} network error: ${err.message}`);
+      tryModel(idx + 1);
+    });
+    r.setTimeout(120000, () => {
+      lastError = `${model} timeout`;
+      r.destroy();
+      tryModel(idx + 1);
+    });
     r.write(payload);
     r.end();
   };
