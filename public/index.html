@@ -192,7 +192,7 @@
     .toast.show{opacity:1;transform:translateX(-50%) translateY(0)}
 
     /* Generate menu dropdown */
-    .gen-menu{position:absolute;top:calc(100% + 6px);right:0;width:260px;background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:6px;display:none;flex-direction:column;gap:2px;box-shadow:0 20px 40px rgba(0,0,0,0.5);z-index:100}
+    .gen-menu{position:absolute;top:calc(100% + 6px);right:0;width:260px;max-height:min(520px,calc(100vh - 120px));overflow-y:auto;background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:6px;display:none;flex-direction:column;gap:2px;box-shadow:0 20px 40px rgba(0,0,0,0.5);z-index:100}
     .gen-menu.open{display:flex}
     .gen-menu-item{display:flex;align-items:center;gap:10px;padding:10px;border-radius:8px;cursor:pointer;transition:background .15s}
     .gen-menu-item:hover{background:var(--surface3)}
@@ -377,6 +377,15 @@
             <div class="gen-menu-item" onclick="generatePage('product')"><div class="gen-icon" style="background:rgba(34,197,94,0.15);color:var(--green)"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 2 3 6v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V6l-3-4Z"/><path d="M3 6h18"/><path d="M16 10a4 4 0 0 1-8 0"/></svg></div><div><div class="gen-title">商品详情页</div><div class="gen-desc">图册 · 选项 · 加购</div></div></div>
             <div class="gen-menu-item" onclick="generatePage('settings')"><div class="gen-icon" style="background:rgba(245,158,11,0.15);color:var(--amber)"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.39a2 2 0 0 0-.73-2.73l-.15-.08a2 2 0 0 1-1-1.74v-.5a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2Z"/><circle cx="12" cy="12" r="3"/></svg></div><div><div class="gen-title">设置页</div><div class="gen-desc">表单 · 开关 · 账户</div></div></div>
             <div class="gen-menu-item" onclick="generatePage('pricing')"><div class="gen-icon" style="background:rgba(236,72,153,0.15);color:var(--pink)"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20.59 13.41 13.42 20.58a2 2 0 0 1-2.83 0L2 12V2h10l8.59 8.59a2 2 0 0 1 0 2.82z"/><line x1="7" y1="7" x2="7.01" y2="7"/></svg></div><div><div class="gen-title">定价页</div><div class="gen-desc">套餐卡片 · 对比表</div></div></div>
+            <div class="gen-menu-divider"></div>
+            <div class="gen-menu-item" onclick="generatePage('blog')"><div class="gen-icon" style="background:rgba(249,115,22,0.15);color:var(--orange)"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 19.5v-15A2.5 2.5 0 0 1 6.5 2H20v20H6.5a2.5 2.5 0 0 1 0-5H20"/><path d="M8 7h6"/><path d="M8 11h8"/></svg></div><div><div class="gen-title">博客文章页</div><div class="gen-desc">文章 · 目录 · 作者 · 相关推荐</div></div></div>
+            <div class="gen-menu-item" onclick="generatePage('portfolio')"><div class="gen-icon" style="background:rgba(168,85,247,0.15);color:var(--purple)"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="2" width="8" height="8" rx="1"/><rect x="14" y="2" width="8" height="8" rx="1"/><rect x="2" y="14" width="8" height="8" rx="1"/><rect x="14" y="14" width="8" height="8" rx="1"/></svg></div><div><div class="gen-title">作品集</div><div class="gen-desc">项目画廊 · 关于 · 联系</div></div></div>
+            <div class="gen-menu-item" onclick="generatePage('login')"><div class="gen-icon" style="background:rgba(6,182,212,0.15);color:var(--cyan)"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/><circle cx="12" cy="16" r="1"/></svg></div><div><div class="gen-title">登录注册页</div><div class="gen-desc">表单 · 社交登录 · 忘记密码</div></div></div>
+            <div class="gen-menu-item" onclick="generatePage('profile')"><div class="gen-icon" style="background:rgba(92,170,252,0.15);color:var(--blue)"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="8" r="4"/><path d="M20 21a8 8 0 0 0-16 0"/></svg></div><div><div class="gen-title">个人主页</div><div class="gen-desc">头像 · 动态 · 粉丝 · Tab</div></div></div>
+            <div class="gen-menu-item" onclick="generatePage('error')"><div class="gen-icon" style="background:rgba(239,68,68,0.15);color:var(--red)"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg></div><div><div class="gen-title">404 错误页</div><div class="gen-desc">创意插画 · 搜索 · 返回</div></div></div>
+            <div class="gen-menu-item" onclick="generatePage('changelog')"><div class="gen-icon" style="background:rgba(34,197,94,0.15);color:var(--green)"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg></div><div><div class="gen-title">更新日志</div><div class="gen-desc">版本时间线 · 标签分类</div></div></div>
+            <div class="gen-menu-item" onclick="generatePage('docs')"><div class="gen-icon" style="background:rgba(161,161,170,0.15);color:var(--text3)"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2z"/><path d="M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z"/></svg></div><div><div class="gen-title">文档页</div><div class="gen-desc">侧边导航 · 代码块 · 目录</div></div></div>
+            <div class="gen-menu-item" onclick="generatePage('appShowcase')"><div class="gen-icon" style="background:rgba(124,92,252,0.15);color:var(--primary)"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="5" y="2" width="14" height="20" rx="2"/><line x1="12" y1="18" x2="12.01" y2="18"/></svg></div><div><div class="gen-title">App 展示页</div><div class="gen-desc">手机模型 · 功能介绍 · 下载</div></div></div>
             <div class="gen-menu-divider"></div>
             <div class="gen-menu-item" onclick="downloadMd()"><div class="gen-icon" style="background:rgba(161,161,170,0.15);color:var(--text3)"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7,10 12,15 17,10"/><line x1="12" y1="15" x2="12" y2="3"/></svg></div><div><div class="gen-title">下载 DESIGN.md</div><div class="gen-desc">原始 Markdown 文件</div></div></div>
           </div>
@@ -1273,27 +1282,44 @@ function focusUrl(){document.getElementById('promptInput').focus();document.getE
 function toggleMic(){showToast('语音功能开发中')}
 
 document.getElementById('chatInput').addEventListener('keydown',e=>{
-  if(e.key==='Enter'){executeCommand(e.target.value.trim());e.target.value=''}
+  if(e.key==='Enter'){const v=e.target.value.trim();e.target.value='';executeCommand(v)}
 });
 
-function executeCommand(cmd){
+async function executeCommand(cmd){
   if(!cmd)return;
   let md=document.getElementById('rawMd').value;
+  if(!md){showToast('请先加载一个设计系统');return}
+
+  // Fast path: simple color change via regex
   const colorChange=cmd.match(/(?:把|change|set|改)\s*(\S+?)\s*(?:改成|改为|to|变成)\s*(#[0-9a-fA-F]{3,8}|\S+)/i);
   if(colorChange){
     const[,name,color]=colorChange;const hex=namedToHex(color);
     const re1=new RegExp(`(\\*\\*${name}\\*\\*\\s*\\()\`[^)]+\`(\\))`,'i');
     const re2=new RegExp(`(- ${name}:)\\s*\`?#[0-9a-fA-F]{3,8}\`?`,'i');
-    if(re1.test(md))md=md.replace(re1,`$1\`${hex}\`$2`);
-    else if(re2.test(md))md=md.replace(re2,`$1 \`${hex}\``);
-    else{showToast('未找到: '+name);return}
-    document.getElementById('rawMd').value=md;
-    currentDesign=parseDesignMd(md);
-    renderEditor();
-    showToast(`已更新 ${name} → ${hex}`);
-    return;
+    if(re1.test(md)){md=md.replace(re1,`$1\`${hex}\`$2`);document.getElementById('rawMd').value=md;currentDesign=parseDesignMd(md);renderEditor();showToast(`已更新 ${name} → ${hex}`);return}
+    if(re2.test(md)){md=md.replace(re2,`$1 \`${hex}\``);document.getElementById('rawMd').value=md;currentDesign=parseDesignMd(md);renderEditor();showToast(`已更新 ${name} → ${hex}`);return}
   }
-  showToast('试试: "把Primary改成#FF0000"');
+
+  // AI path: send to Gemini for complex edits
+  const chatInput=document.getElementById('chatInput');
+  chatInput.disabled=true;chatInput.placeholder='AI 正在修改...';
+  showToast('⏳ AI 处理中...');
+  try{
+    const r=await fetch('/api/edit-design',{
+      method:'POST',headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({designMd:md,command:cmd})
+    });
+    const data=await r.json();
+    if(data.error){showToast('❌ '+data.error);return}
+    document.getElementById('rawMd').value=data.content;
+    currentDesign=parseDesignMd(data.content);
+    renderEditor();
+    showToast('✅ 已应用: '+cmd);
+  }catch(e){
+    showToast('❌ 网络错误');
+  }finally{
+    chatInput.disabled=false;chatInput.placeholder='"把主色改成深蓝"  "圆角改成12px"  "加一个阴影段落"';chatInput.focus();
+  }
 }
 
 function namedToHex(c){

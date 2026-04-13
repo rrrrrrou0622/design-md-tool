@@ -4,6 +4,15 @@ const fs = require('fs');
 const { execSync } = require('child_process');
 const https = require('https');
 
+// Load .env if present
+const envPath = path.join(__dirname, '.env');
+if (fs.existsSync(envPath)) {
+  for (const line of fs.readFileSync(envPath, 'utf-8').split('\n')) {
+    const m = line.match(/^([^#=]+)=(.*)$/);
+    if (m && !process.env[m[1].trim()]) process.env[m[1].trim()] = m[2].trim();
+  }
+}
+
 const app = express();
 const PORT = process.env.PORT || 3100;
 
@@ -38,6 +47,38 @@ app.post('/api/generate-page', async (req, res) => {
     pricing: {
       name: '定价页',
       brief: 'A pricing page with: headline, monthly/yearly toggle, 3-4 pricing tier cards (name, price, feature list with checkmarks, CTA button), feature comparison table below, FAQ section.'
+    },
+    blog: {
+      name: '博客文章页',
+      brief: 'A blog article page with: top navigation, article header (title in large type, author avatar + name + date, read time, category tag), hero/cover image, long-form article body (headings, paragraphs, blockquotes, inline code, an image with caption, a bulleted list), a table of contents sidebar on desktop (sticky), author bio card at bottom, related posts grid (3 cards with thumbnail + title + excerpt), comment section placeholder, and footer.'
+    },
+    portfolio: {
+      name: '作品集',
+      brief: 'A creative portfolio page with: minimal top nav (name/logo + contact), a large hero statement (designer/developer tagline), a masonry or grid gallery of 6-8 project cards (each with cover image placeholder, project name, category tag, hover overlay with "View" button), an about section (photo placeholder + short bio + skill tags), a testimonial quote, and a contact CTA section with email link.'
+    },
+    login: {
+      name: '登录注册页',
+      brief: 'An auth page with: centered card on a subtle gradient or pattern background, logo at top, tab toggle between Login and Sign Up, login form (email input, password input with show/hide toggle, "forgot password" link, submit button), sign-up form (name, email, password, confirm password, terms checkbox, submit), social login divider ("or continue with") and 3 social buttons (Google, GitHub, Apple icons), footer links (privacy, terms).'
+    },
+    profile: {
+      name: '个人主页',
+      brief: 'A user profile page with: cover/banner image area, circular avatar overlapping the banner, user name + handle + short bio, stats row (posts, followers, following counts), tab bar (Posts, Projects, Likes, About), content feed below showing 4-5 post cards (text + image + engagement counts), right sidebar with suggested users list and trending tags. Mobile: single column, tabs become horizontally scrollable.'
+    },
+    error: {
+      name: '404 错误页',
+      brief: 'A 404 error page with: centered layout, large decorative "404" text (creative typography or inline SVG illustration), a friendly headline ("页面走丢了" or similar), a short description paragraph, a search input field, a "返回首页" primary button, and 3-4 suggested page links below. The page should feel on-brand and have personality, not generic.'
+    },
+    changelog: {
+      name: '更新日志',
+      brief: 'A changelog/release notes page with: top nav, page title "更新日志" with subtitle, a timeline layout where each entry has: version badge (e.g. v2.4.0), date, release title, categorized items with colored tags (New/新功能 in green, Improved/优化 in blue, Fixed/修复 in amber, Breaking/破坏性变更 in red), each item is one line of description. Show 5-6 releases. Include a "Subscribe to updates" email input at top.'
+    },
+    docs: {
+      name: '文档页',
+      brief: 'A documentation page with: top nav (logo + search bar + version dropdown + GitHub link), left sidebar with nested navigation (Getting Started, Installation, Configuration, API Reference, Examples — with expandable sub-items), main content area with: breadcrumb, h1 title, "On this page" right sidebar (table of contents), content body with headings, paragraphs, a code block with syntax highlighting colors and copy button, a callout/admonition box (tip), a parameters table, and prev/next navigation at bottom.'
+    },
+    appShowcase: {
+      name: 'App 展示页',
+      brief: 'A mobile app showcase/download page with: sticky nav (logo + features link + download button), hero section with large phone mockup frame (use a colored rectangle as screen placeholder) + headline + subtitle + two download buttons (App Store and Google Play with icons), scrolling feature sections (alternating left-right layout: phone mockup + feature title + description + bullet points, 3 sections), a stats/social proof bar (downloads count, rating, reviews), testimonial cards carousel (3 cards), and a final CTA section with download buttons and QR code placeholder.'
     }
   };
 
@@ -493,6 +534,87 @@ app.get('/api/templates/:id', async (req, res) => {
     console.error('Template fetch error:', err.message);
     res.status(500).json({ error: '获取模版失败: ' + err.message });
   }
+});
+
+// ─── Gemini: AI edit DESIGN.md with natural language ──────────
+app.post('/api/edit-design', async (req, res) => {
+  const { designMd, command } = req.body;
+  if (!designMd || !command) return res.status(400).json({ error: 'designMd and command required' });
+
+  const apiKey = process.env.GEMINI_API_KEY;
+  if (!apiKey) return res.status(500).json({ error: 'GEMINI_API_KEY not configured' });
+
+  const prompt = `You are a design system editor. The user wants to modify this DESIGN.md file.
+
+CURRENT DESIGN.MD:
+${designMd.length > 6000 ? designMd.substring(0, 6000) + '\n(truncated)' : designMd}
+
+USER COMMAND: ${command}
+
+RULES:
+- Apply the user's requested change to the DESIGN.md
+- Keep the same 9-section structure and markdown format
+- Only modify sections relevant to the command
+- If the user says "改成" / "变成" / "change to", update the specific value
+- If the user says "加" / "添加" / "add", insert new content in the appropriate section
+- If the user says "删" / "去掉" / "remove", remove the specified content
+- Common changes: colors, fonts, border-radius, shadows, spacing, components, do's/don'ts
+- Output ONLY the complete modified DESIGN.md, no explanation, no code fences
+- Preserve all existing content that wasn't changed`;
+
+  const payload = JSON.stringify({
+    contents: [{ parts: [{ text: prompt }] }],
+    generationConfig: { temperature: 0.2, maxOutputTokens: 8192 }
+  });
+
+  const models = ['gemini-2.5-flash', 'gemini-2.5-pro'];
+  let lastError = '';
+
+  const tryModel = (idx) => {
+    if (idx >= models.length) {
+      return res.status(503).json({ error: lastError || 'All models unavailable' });
+    }
+    const model = models[idx];
+    console.log(`[edit-design] Trying ${model}: "${command}"`);
+    const options = {
+      hostname: 'generativelanguage.googleapis.com',
+      path: `/v1beta/models/${model}:generateContent?key=${apiKey}`,
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'Content-Length': Buffer.byteLength(payload) },
+      timeout: 60000
+    };
+    const r = https.request(options, (resp) => {
+      let data = '';
+      resp.on('data', c => data += c);
+      resp.on('end', () => {
+        try {
+          const json = JSON.parse(data);
+          if (json.error) {
+            lastError = json.error.message || 'API error';
+            console.log(`[edit-design] ${model} error: ${lastError}`);
+            return tryModel(idx + 1);
+          }
+          const text = json.candidates?.[0]?.content?.parts?.[0]?.text;
+          if (!text) {
+            lastError = `${model}: empty response`;
+            return tryModel(idx + 1);
+          }
+          const cleaned = text.replace(/^```markdown?\n?/i, '').replace(/\n?```\s*$/i, '').trim();
+          console.log(`[edit-design] ${model} success, ${cleaned.length} chars`);
+          res.json({ content: cleaned, model });
+        } catch (e) {
+          lastError = `Parse error: ${e.message}`;
+          tryModel(idx + 1);
+        }
+      });
+    });
+    r.on('error', (err) => { lastError = err.message; tryModel(idx + 1); });
+    r.setTimeout(60000, () => { lastError = `${model} timeout`; r.destroy(); tryModel(idx + 1); });
+    r.write(payload);
+    r.end();
+  };
+
+  tryModel(0);
 });
 
 // Extract design language from URL using puppeteer
