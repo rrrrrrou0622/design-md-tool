@@ -116,11 +116,22 @@ RULES:
 
   const models = ['gemini-2.5-flash', 'gemini-2.5-pro'];
 
+  // Classify Gemini errors into user-friendly Chinese messages
+  function classifyError(statusCode, message) {
+    if (statusCode === 401 || statusCode === 403) return 'Gemini API 密钥无效或权限不足，请检查配置';
+    if (statusCode === 429) return 'Gemini API 调用次数超限，请稍后重试';
+    if (statusCode >= 500) return 'AI 服务暂时不可用，请稍后重试';
+    return message || '生成失败，请重试';
+  }
+
   let lastError = '';
+  let responded = false;
   const tryModel = (idx) => {
+    if (responded) return;
     if (idx >= models.length) {
+      responded = true;
       console.error('All page-gen models failed. Last error:', lastError);
-      return res.status(503).json({ error: lastError || 'All models unavailable, please try again' });
+      return res.status(503).json({ error: lastError || '所有 AI 模型暂时不可用，请稍后重试' });
     }
     const model = models[idx];
     console.log(`[generate-page] Trying ${model} for ${pageType}...`);
@@ -131,41 +142,55 @@ RULES:
       headers: { 'Content-Type': 'application/json', 'Content-Length': Buffer.byteLength(payload) },
       timeout: 120000
     };
+    let settled = false;
+    const settle = () => { if (settled) return false; settled = true; return true; };
+
     const r = https.request(options, (resp) => {
       let data = '';
       resp.on('data', c => data += c);
       resp.on('end', () => {
+        if (!settle()) return;
         try {
           const json = JSON.parse(data);
           if (json.error) {
-            lastError = json.error.message || 'Unknown error';
-            console.log(`[generate-page] ${model} error (${resp.statusCode}): ${lastError}`);
+            lastError = classifyError(resp.statusCode, json.error.message);
+            console.log(`[generate-page] ${model} error (${resp.statusCode}): ${json.error.message}`);
             return tryModel(idx + 1);
           }
           const text = json.candidates?.[0]?.content?.parts?.[0]?.text;
           if (!text) {
             const reason = json.candidates?.[0]?.finishReason || 'empty';
-            lastError = `${model}: empty response (${reason})`;
-            console.log(`[generate-page] ${lastError}`);
+            lastError = `AI 未生成有效内容（${reason}），请重试`;
+            console.log(`[generate-page] ${model}: empty response (${reason})`);
             return tryModel(idx + 1);
           }
-          console.log(`[generate-page] ${model} success, ${text.length} chars`);
           const cleaned = text.replace(/^```html?\n?/i, '').replace(/\n?```\s*$/i, '').trim();
+          // Basic HTML validation: must contain at least one HTML-like tag
+          if (!/<\w+[\s>]/i.test(cleaned)) {
+            lastError = 'AI 生成的内容不是有效 HTML，请重试';
+            console.log(`[generate-page] ${model}: invalid HTML (no tags found), ${cleaned.length} chars`);
+            return tryModel(idx + 1);
+          }
+          console.log(`[generate-page] ${model} success, ${cleaned.length} chars`);
+          responded = true;
           res.json({ html: cleaned, model, pageType });
         } catch (e) {
-          lastError = `Parse error: ${e.message}`;
-          console.log(`[generate-page] ${lastError}`);
+          lastError = '解析 AI 响应失败，请重试';
+          console.log(`[generate-page] ${model} parse error: ${e.message}`);
           tryModel(idx + 1);
         }
       });
     });
     r.on('error', (err) => {
-      lastError = err.message;
+      if (!settle()) return;
+      lastError = '无法连接 AI 服务，请检查网络连接';
       console.log(`[generate-page] ${model} network error: ${err.message}`);
       tryModel(idx + 1);
     });
     r.setTimeout(120000, () => {
-      lastError = `${model} timeout`;
+      if (!settle()) return;
+      lastError = 'AI 生成超时，请稍后重试';
+      console.log(`[generate-page] ${model} timeout`);
       r.destroy();
       tryModel(idx + 1);
     });
@@ -179,10 +204,22 @@ RULES:
 // ─── Gemini Vision: analyze screenshot into DESIGN.md ──────────
 app.post('/api/analyze-image', async (req, res) => {
   const { imageBase64, userPrompt } = req.body;
-  if (!imageBase64) return res.status(400).json({ error: 'Image required' });
+  if (!imageBase64) return res.status(400).json({ error: '请上传一张图片' });
+
+  // Validate base64 size (~10MB image ≈ ~13.3MB base64)
+  if (imageBase64.length > 14 * 1024 * 1024) {
+    return res.status(413).json({ error: '图片文件过大，请压缩后重试（最大 10MB）' });
+  }
+
+  // Validate MIME type from data URI
+  const mimeMatch = imageBase64.match(/^data:([^;]+);base64,/);
+  const allowed = ['image/png', 'image/jpeg', 'image/webp'];
+  if (!mimeMatch || !allowed.includes(mimeMatch[1])) {
+    return res.status(400).json({ error: '仅支持 PNG、JPG、WebP 格式的图片' });
+  }
 
   const apiKey = process.env.GEMINI_API_KEY;
-  if (!apiKey) return res.status(500).json({ error: 'GEMINI_API_KEY not configured' });
+  if (!apiKey) return res.status(500).json({ error: 'GEMINI_API_KEY 未配置，请在 .env 文件中设置' });
 
   const base64Data = imageBase64.replace(/^data:image\/\w+;base64,/, '');
   const mimeType = imageBase64.match(/^data:(image\/\w+);base64,/)?.[1] || 'image/png';
@@ -322,9 +359,17 @@ Now analyze the screenshot and generate the DESIGN.md:`;
     'gemini-pro-latest'
   ];
 
+  let responded = false;
+  const sendResponse = (status, body) => {
+    if (responded) return;
+    responded = true;
+    res.status(status).json(body);
+  };
+
   const tryModel = (modelIdx) => {
+    if (responded) return;
     if (modelIdx >= models.length) {
-      return res.status(503).json({ error: 'All Gemini models overloaded, please try again later' });
+      return sendResponse(503, { error: '所有 AI 模型暂时不可用，请稍后重试' });
     }
     const model = models[modelIdx];
     const options = {
@@ -344,34 +389,48 @@ Now analyze the screenshot and generate the DESIGN.md:`;
         try {
           const json = JSON.parse(data);
           if (json.error) {
+            const code = response.statusCode;
             const msg = json.error.message || '';
-            console.log(`${model} error (${response.statusCode}): ${msg}`);
-            // Try next model on any recoverable error
-            if (modelIdx < models.length - 1) {
-              return tryModel(modelIdx + 1);
+            console.log(`${model} error (${code}): ${msg}`);
+            if (code === 401 || code === 403) {
+              return sendResponse(500, { error: 'Gemini API 密钥无效或权限不足，请检查配置' });
             }
-            return res.status(500).json({ error: msg || 'Gemini API error' });
+            if (code === 429) {
+              if (modelIdx < models.length - 1) return tryModel(modelIdx + 1);
+              return sendResponse(429, { error: 'Gemini API 调用次数超限，请稍后重试' });
+            }
+            if (modelIdx < models.length - 1) return tryModel(modelIdx + 1);
+            return sendResponse(500, { error: 'AI 分析服务暂时不可用，请稍后重试' });
           }
           const text = json.candidates?.[0]?.content?.parts?.[0]?.text;
           if (!text) {
-            // Some models return empty when image rejected — try next
-            return tryModel(modelIdx + 1);
+            const reason = json.candidates?.[0]?.finishReason || 'empty';
+            console.log(`${model}: empty response (${reason})`);
+            if (modelIdx < models.length - 1) return tryModel(modelIdx + 1);
+            return sendResponse(500, { error: 'AI 未能识别截图内容，请尝试更清晰的截图' });
           }
-          // Strip markdown code fences if present
           const cleaned = text.replace(/^```markdown?\n?/i, '').replace(/\n?```\s*$/i, '').trim();
-          // Fill in any missing sections with sensible defaults
           const complete = ensureCompleteness(cleaned);
-          res.json({ content: complete, model });
+          sendResponse(200, { content: complete, model });
         } catch (e) {
           console.error('Parse error:', e, data.substring(0, 500));
-          tryModel(modelIdx + 1);
+          if (modelIdx < models.length - 1) return tryModel(modelIdx + 1);
+          sendResponse(500, { error: 'AI 响应解析失败，请重试' });
         }
       });
     });
 
     request.on('error', (err) => {
       console.error(`${model} request error:`, err);
-      tryModel(modelIdx + 1);
+      if (modelIdx < models.length - 1) return tryModel(modelIdx + 1);
+      sendResponse(500, { error: '无法连接 AI 服务，请检查网络连接' });
+    });
+
+    request.setTimeout(120000, () => {
+      console.log(`${model} request timeout`);
+      request.destroy();
+      if (modelIdx < models.length - 1) return tryModel(modelIdx + 1);
+      sendResponse(504, { error: 'AI 分析超时，请稍后重试' });
     });
 
     request.write(payload);
@@ -459,33 +518,26 @@ app.get('/api/templates', (req, res) => {
 // Get a template's DESIGN.md content
 app.get('/api/templates/:id', async (req, res) => {
   const { id } = req.params;
-  if (!TEMPLATE_META[id]) return res.status(404).json({ error: 'Template not found' });
+  if (!TEMPLATE_META[id]) return res.status(404).json({ error: '模版不存在' });
 
   const filePath = path.join(TEMPLATES_DIR, id, 'DESIGN.md');
 
   // If already downloaded, serve it
   if (fs.existsSync(filePath)) {
-    return res.json({ content: fs.readFileSync(filePath, 'utf-8') });
+    const cached = fs.readFileSync(filePath, 'utf-8');
+    if (cached && cached.length > 100) {
+      return res.json({ content: cached });
+    }
+    // Cached file is invalid, remove and re-download
+    fs.unlinkSync(filePath);
   }
 
-  // Download via fetch from getdesign.md API
+  // Download via npx getdesign
+  const tmpDir = `/tmp/designmd_${Date.now()}`;
   try {
-    const https = require('https');
-    const fetchMd = (url) => new Promise((resolve, reject) => {
-      https.get(url, { headers: { 'User-Agent': 'DesignMD-Tool' } }, (resp) => {
-        if (resp.statusCode >= 300 && resp.statusCode < 400 && resp.headers.location) {
-          return fetchMd(resp.headers.location).then(resolve).catch(reject);
-        }
-        let data = '';
-        resp.on('data', chunk => data += chunk);
-        resp.on('end', () => resp.statusCode === 200 ? resolve(data) : reject(new Error(`HTTP ${resp.statusCode}`)));
-      }).on('error', reject);
-    });
-
-    // Try npx in isolated tmp dir
-    const tmpDir = `/tmp/designmd_${Date.now()}`;
     fs.mkdirSync(tmpDir, { recursive: true });
 
+    let npxError = null;
     try {
       execSync(`npx getdesign@latest add ${id}`, {
         cwd: tmpDir,
@@ -493,7 +545,10 @@ app.get('/api/templates/:id', async (req, res) => {
         stdio: 'pipe',
         env: { ...process.env, HOME: tmpDir }
       });
-    } catch {}
+    } catch (e) {
+      npxError = e;
+      console.log(`[template] npx getdesign add ${id} failed: ${e.message?.substring(0, 200)}`);
+    }
 
     // Search for the file in multiple locations
     const searchPaths = [
@@ -520,19 +575,29 @@ app.get('/api/templates/:id', async (req, res) => {
       } catch {}
     }
 
-    // Cleanup
+    // Cleanup tmp dir
     fs.rmSync(tmpDir, { recursive: true, force: true });
 
-    if (content && content.length > 100) {
+    // Validate content: must be >100 chars and contain at least one ## heading
+    if (content && content.length > 100 && /^##\s+/m.test(content)) {
       fs.mkdirSync(path.join(TEMPLATES_DIR, id), { recursive: true });
       fs.writeFileSync(filePath, content, 'utf-8');
       return res.json({ content });
     }
 
+    // Determine specific error
+    if (npxError && /ETIMEDOUT|timeout/i.test(npxError.message)) {
+      return res.status(504).json({ error: '模版下载超时，请稍后重试' });
+    }
+    if (content && content.length <= 100) {
+      return res.status(502).json({ error: '模版内容不完整，请稍后重试' });
+    }
     res.status(500).json({ error: '模版下载失败，请稍后重试' });
   } catch (err) {
+    // Cleanup on error
+    try { fs.rmSync(tmpDir, { recursive: true, force: true }); } catch {}
     console.error('Template fetch error:', err.message);
-    res.status(500).json({ error: '获取模版失败: ' + err.message });
+    res.status(500).json({ error: '获取模版失败，请稍后重试' });
   }
 });
 
@@ -622,9 +687,20 @@ app.post('/api/extract', async (req, res) => {
   const { url } = req.body;
   if (!url) return res.status(400).json({ error: 'URL is required' });
 
+  // Validate URL format
+  try {
+    const parsed = new URL(url);
+    if (!['http:', 'https:'].includes(parsed.protocol)) {
+      return res.status(400).json({ error: '仅支持 http/https 协议的网址' });
+    }
+  } catch {
+    return res.status(400).json({ error: 'URL 格式无效，请输入正确的网址' });
+  }
+
+  let browser;
   try {
     const puppeteer = require('puppeteer');
-    const browser = await puppeteer.launch({
+    browser = await puppeteer.launch({
       headless: 'new',
       args: ['--no-sandbox', '--disable-setuid-sandbox', '--disable-gpu'],
       executablePath: process.env.PUPPETEER_EXECUTABLE_PATH || undefined
@@ -727,10 +803,31 @@ app.post('/api/extract', async (req, res) => {
     });
 
     await browser.close();
+    browser = null;
     res.json(designData);
   } catch (err) {
     console.error('Extract error:', err.message);
-    res.status(500).json({ error: err.message });
+    // Classify Puppeteer errors into user-friendly messages
+    const msg = err.message || '';
+    let userMsg;
+    if (msg.includes('TimeoutError') || msg.includes('timeout') || msg.includes('Navigation timeout')) {
+      userMsg = '页面加载超时，该网站响应过慢，请稍后重试';
+    } else if (msg.includes('ERR_NAME_NOT_RESOLVED') || msg.includes('getaddrinfo')) {
+      userMsg = '域名无法解析，请检查网址是否正确';
+    } else if (msg.includes('ERR_SSL') || msg.includes('SSL') || msg.includes('certificate')) {
+      userMsg = '该网站 SSL 证书有问题，无法安全连接';
+    } else if (msg.includes('ERR_CONNECTION_REFUSED')) {
+      userMsg = '连接被拒绝，该网站可能已下线';
+    } else if (msg.includes('ERR_CONNECTION_RESET') || msg.includes('ECONNRESET')) {
+      userMsg = '连接被重置，请稍后重试';
+    } else if (msg.includes('ERR_INTERNET_DISCONNECTED') || msg.includes('ENETUNREACH')) {
+      userMsg = '网络不可用，请检查网络连接';
+    } else {
+      userMsg = '无法访问该网站: ' + msg;
+    }
+    res.status(500).json({ error: userMsg });
+  } finally {
+    if (browser) try { await browser.close(); } catch {}
   }
 });
 

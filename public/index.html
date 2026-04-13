@@ -454,7 +454,7 @@
   <textarea id="rawMd" style="display:none"></textarea>
 
 <script>
-let allTemplates=[],currentFilter='全部',currentDesign=null;
+let allTemplates=[],currentFilter='全部',currentDesign=null,templateLoading=false;
 const CATEGORY_ZH={AI:'AI',Developer:'开发者',Design:'设计',Fintech:'金融',Consumer:'消费',Automotive:'汽车',Infrastructure:'基础设施',Productivity:'生产力',Enterprise:'企业'};
 const CATEGORY_ICONS={'全部':'sparkles','AI':'cpu','开发者':'code','设计':'palette','金融':'credit-card','消费':'shopping-bag','汽车':'car','基础设施':'server','生产力':'zap','企业':'building-2'};
 
@@ -528,10 +528,12 @@ function showView(v){
 async function loadTemplates(){
   try{
     const r=await fetch('/api/templates');
+    if(!r.ok)throw new Error('服务器错误');
     allTemplates=await r.json();
+    if(!allTemplates.length)throw new Error('模版列表为空');
     renderGallery();
   }catch(e){
-    document.getElementById('galGrid').innerHTML='<p style="color:var(--muted)">加载失败</p>';
+    document.getElementById('galGrid').innerHTML='<p style="color:var(--muted)">模版库加载失败：'+(e.message||'网络错误')+'。请刷新页面重试。</p>';
   }
 }
 
@@ -572,21 +574,36 @@ function renderGallery(){
 function filterGallery(c){currentFilter=c;renderGallery()}
 
 async function loadTemplate(id){
-  showToast('加载中...');
+  if(templateLoading){showToast('正在加载模版，请稍候...');return}
+  templateLoading=true;
+  showToast('正在加载模版，请稍候...');
+  const controller=new AbortController();
+  const timeout=setTimeout(()=>controller.abort(),45000);
   try{
-    const r=await fetch('/api/templates/'+encodeURIComponent(id));
-    if(!r.ok)throw new Error((await r.json()).error||'加载失败');
+    const r=await fetch('/api/templates/'+encodeURIComponent(id),{signal:controller.signal});
+    clearTimeout(timeout);
+    if(!r.ok){
+      let errMsg='加载失败';
+      try{const j=await r.json();errMsg=j.error||errMsg}catch{}
+      throw new Error(errMsg);
+    }
     const{content}=await r.json();
+    if(!content||content.trim().length<50){throw new Error('模版内容为空或不完整')}
     document.getElementById('rawMd').value=content;
     const tpl=allTemplates.find(t=>t.id===id);
     document.getElementById('bcName').textContent=tpl?.name||id;
     const sw=TPL_SWATCHES[id]||['#7C5CFC'];
     document.getElementById('bcDot').style.background=sw[0];
     currentDesign=parseDesignMd(content);
+    if(!currentDesign||!currentDesign.length){throw new Error('模版内容格式异常，无法解析')}
     renderEditor();
     showView('editor');
     showToast((tpl?.name||id)+' 已加载');
-  }catch(e){showToast('错误: '+e.message)}
+  }catch(e){
+    clearTimeout(timeout);
+    if(e.name==='AbortError'){showToast('模版加载超时，请稍后重试')}
+    else{showToast('错误: '+e.message)}
+  }finally{templateLoading=false}
 }
 
 function parseDesignMd(md){
@@ -814,43 +831,80 @@ document.addEventListener('click',e=>{
 });
 
 let currentGeneratedHtml='';
-const PAGE_NAMES={dashboard:'Dashboard 仪表盘',landing:'落地页',product:'商品详情页',settings:'设置页',pricing:'定价页'};
+const PAGE_NAMES={dashboard:'Dashboard 仪表盘',landing:'落地页',product:'商品详情页',settings:'设置页',pricing:'定价页',blog:'博客文章页',portfolio:'作品集',login:'登录注册页',profile:'个人主页',error:'404 错误页',changelog:'更新日志',docs:'文档页',appShowcase:'App 展示页'};
 
+let pageGenerating=false;
 async function generatePage(type){
   document.getElementById('genMenu').classList.remove('open');
+  if(pageGenerating){showToast('正在生成中，请稍候');return}
   const md=document.getElementById('rawMd').value;
   if(!md){showToast('请先加载一个 DESIGN.md');return}
 
-  // Open drawer with loading state
+  pageGenerating=true;
+
+  // Reset & open drawer with loading state
+  const loadingEl=document.getElementById('previewLoading');
+  loadingEl.innerHTML='<div class="spinner"></div><div>Gemini 正在生成页面...</div><div style="font-size:11px;color:var(--text3)">通常需要 10-30 秒</div>';
   document.getElementById('previewTitle').textContent=PAGE_NAMES[type]||'生成中';
   document.getElementById('previewFrame').style.display='none';
-  document.getElementById('previewLoading').style.display='flex';
+  loadingEl.style.display='flex';
   document.getElementById('previewOverlay').classList.add('show');
   document.getElementById('previewDrawer').classList.add('open');
+
+  const ac=new AbortController();
+  const timer=setTimeout(()=>ac.abort(),150000);
 
   try{
     const r=await fetch('/api/generate-page',{
       method:'POST',
       headers:{'Content-Type':'application/json'},
-      body:JSON.stringify({designMd:md,pageType:type})
+      body:JSON.stringify({designMd:md,pageType:type}),
+      signal:ac.signal
     });
+    clearTimeout(timer);
     if(!r.ok){
-      const err=await r.json();
-      throw new Error(err.error||'生成失败');
+      let msg='生成失败';
+      try{const err=await r.json();msg=err.error||msg}catch(_){}
+      throw new Error(msg);
     }
     const{html}=await r.json();
     currentGeneratedHtml=html;
 
-    // Render into iframe using srcdoc
+    // Render into iframe with fallback timeout
     const iframe=document.getElementById('previewFrame');
     iframe.srcdoc=html;
+    let iframeLoaded=false;
+    const iframeFallback=setTimeout(()=>{
+      if(!iframeLoaded){loadingEl.style.display='none';iframe.style.display='block'}
+    },5000);
     iframe.onload=()=>{
-      document.getElementById('previewLoading').style.display='none';
+      iframeLoaded=true;
+      clearTimeout(iframeFallback);
+      loadingEl.style.display='none';
       iframe.style.display='block';
     };
     showToast('生成成功！');
   }catch(e){
-    document.getElementById('previewLoading').innerHTML=`<div style="color:var(--red);font-size:13px">生成失败</div><div style="font-size:11px;color:var(--muted);max-width:400px;text-align:center">${e.message}</div><button class="nav-btn" onclick="generatePage('${type}')" style="margin-top:12px">重试</button>`;
+    clearTimeout(timer);
+    const errMsg=e.name==='AbortError'?'页面生成超时，请稍后重试':e.message;
+    // Safe error display (no innerHTML with untrusted content)
+    loadingEl.textContent='';
+    const errTitle=document.createElement('div');
+    errTitle.style.cssText='color:var(--red);font-size:13px';
+    errTitle.textContent='生成失败';
+    const errDetail=document.createElement('div');
+    errDetail.style.cssText='font-size:11px;color:var(--muted);max-width:400px;text-align:center';
+    errDetail.textContent=errMsg;
+    const retryBtn=document.createElement('button');
+    retryBtn.className='nav-btn';
+    retryBtn.style.marginTop='12px';
+    retryBtn.textContent='重试';
+    retryBtn.onclick=()=>generatePage(type);
+    loadingEl.appendChild(errTitle);
+    loadingEl.appendChild(errDetail);
+    loadingEl.appendChild(retryBtn);
+  }finally{
+    pageGenerating=false;
   }
 }
 
@@ -908,17 +962,24 @@ async function handleGenerate(){
     const btn=document.getElementById('genBtn');
     btn.disabled=true;btn.classList.add('loading');
     showToast('Gemini 正在分析截图...');
+    const controller=new AbortController();
+    const timer=setTimeout(()=>controller.abort(),90000);
     try{
       const r=await fetch('/api/analyze-image',{
         method:'POST',
         headers:{'Content-Type':'application/json'},
-        body:JSON.stringify({imageBase64:uploadedImage,userPrompt:val})
+        body:JSON.stringify({imageBase64:uploadedImage,userPrompt:val}),
+        signal:controller.signal
       });
-      if(!r.ok)throw new Error((await r.json()).error||'分析失败');
+      clearTimeout(timer);
+      if(!r.ok){
+        let msg='分析失败';
+        try{const j=await r.json();msg=j.error||msg}catch{}
+        throw new Error(msg);
+      }
       const{content}=await r.json();
       document.getElementById('rawMd').value=content;
       document.getElementById('bcName').textContent='截图分析';
-      // Extract first hex color for breadcrumb dot
       const firstHex=content.match(/#[0-9a-fA-F]{6}/)?.[0]||'#7C5CFC';
       document.getElementById('bcDot').style.background=firstHex;
       currentDesign=parseDesignMd(content);
@@ -927,8 +988,11 @@ async function handleGenerate(){
       clearImage();
       document.getElementById('promptInput').value='';
       showToast('分析完成！');
-    }catch(e){showToast('分析失败: '+e.message)}
-    finally{btn.disabled=false;btn.classList.remove('loading')}
+    }catch(e){
+      clearTimeout(timer);
+      if(e.name==='AbortError'){showToast('截图分析超时，请稍后重试')}
+      else{showToast('分析失败: '+e.message)}
+    }finally{btn.disabled=false;btn.classList.remove('loading')}
     return;
   }
 
@@ -936,19 +1000,27 @@ async function handleGenerate(){
   if(!val){showToast('请输入网址或上传截图');return}
   if(val.match(/^https?:\/\//i)||val.match(/^[\w-]+\.[\w-]+/)){
     const url=val.match(/^https?:\/\//i)?val:'https://'+val;
+    try{ new URL(url); }catch{ showToast('URL 格式无效，请输入正确的网址');return; }
     extractFromUrl(url);
   }else{
-    showToast('请粘贴网址，或去模版库选择');
-    showView('gallery');
+    showToast('URL 格式无效，请输入正确的网址（如 https://stripe.com）');
   }
 }
 
 async function extractFromUrl(url){
   const btn=document.getElementById('genBtn');
   btn.disabled=true;btn.classList.add('loading');
+  showToast('正在提取设计语言，请稍候...');
+  const controller=new AbortController();
+  const timer=setTimeout(()=>controller.abort(),60000);
   try{
-    const r=await fetch('/api/extract',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({url})});
-    if(!r.ok)throw new Error((await r.json()).error);
+    const r=await fetch('/api/extract',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({url}),signal:controller.signal});
+    clearTimeout(timer);
+    if(!r.ok){
+      let msg='提取失败';
+      try{const j=await r.json();msg=j.error||msg}catch{}
+      throw new Error(msg);
+    }
     const data=await r.json();
     const md=generateStitchMd(data,url);
     document.getElementById('rawMd').value=md;
@@ -959,8 +1031,11 @@ async function extractFromUrl(url){
     renderEditor();
     showView('editor');
     showToast('提取成功！');
-  }catch(e){showToast('错误: '+e.message)}
-  finally{btn.disabled=false;btn.classList.remove('loading')}
+  }catch(e){
+    clearTimeout(timer);
+    if(e.name==='AbortError'){showToast('请求超时，该网站响应过慢，请稍后重试')}
+    else{showToast('错误: '+e.message)}
+  }finally{btn.disabled=false;btn.classList.remove('loading')}
 }
 
 function generateStitchMd(data,url){
@@ -1011,7 +1086,9 @@ function pickFile(){document.getElementById('fileInput').click()}
 function handleFile(e){
   const file=e.target.files[0];
   if(!file)return;
-  if(!file.type.startsWith('image/')){showToast('请上传图片');return}
+  const allowedTypes=['image/png','image/jpeg','image/webp'];
+  if(!allowedTypes.includes(file.type)){showToast('仅支持 PNG、JPG、WebP 格式的图片');return}
+  if(file.size>10*1024*1024){showToast('图片文件过大（超过 10MB），请压缩后重试');return}
   const reader=new FileReader();
   reader.onload=(ev)=>{
     uploadedImage=ev.target.result;
@@ -1355,7 +1432,7 @@ if(promptBox){
   promptBox.addEventListener('drop',e=>{
     promptBox.style.borderColor='';
     const file=e.dataTransfer.files[0];
-    if(file&&file.type.startsWith('image/')){
+    if(file){
       handleFile({target:{files:[file]}});
     }
   });
@@ -1367,7 +1444,7 @@ document.addEventListener('paste',e=>{
     const items=e.clipboardData?.items;
     if(!items)return;
     for(const item of items){
-      if(item.type.startsWith('image/')){
+      if(item.kind==='file'){
         const file=item.getAsFile();
         if(file)handleFile({target:{files:[file]}});
         break;
