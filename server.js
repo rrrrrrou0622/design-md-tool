@@ -140,7 +140,7 @@ RULES:
       path: `/v1beta/models/${model}:generateContent?key=${apiKey}`,
       method: 'POST',
       headers: { 'Content-Type': 'application/json', 'Content-Length': Buffer.byteLength(payload) },
-      timeout: 120000
+      timeout: 65000
     };
     let settled = false;
     const settle = () => { if (settled) return false; settled = true; return true; };
@@ -164,7 +164,11 @@ RULES:
             console.log(`[generate-page] ${model}: empty response (${reason})`);
             return tryModel(idx + 1);
           }
-          const cleaned = text.replace(/^```html?\n?/i, '').replace(/\n?```\s*$/i, '').trim();
+          // Strip code fences: handle "Here's the HTML:\n```html\n...\n```" pattern
+          let cleaned = text;
+          const fenceStart = cleaned.search(/```html?\s*\n/i);
+          if (fenceStart >= 0) cleaned = cleaned.substring(cleaned.indexOf('\n', fenceStart) + 1);
+          cleaned = cleaned.replace(/\n?```\s*$/i, '').trim();
           // Basic HTML validation: must contain at least one HTML-like tag
           if (!/<\w+[\s>]/i.test(cleaned)) {
             lastError = 'AI 生成的内容不是有效 HTML，请重试';
@@ -634,10 +638,13 @@ RULES:
 
   const models = ['gemini-2.5-flash', 'gemini-2.5-pro'];
   let lastError = '';
+  let responded = false;
+  const send = (status, body) => { if (responded) return; responded = true; res.status(status).json(body); };
 
   const tryModel = (idx) => {
+    if (responded) return;
     if (idx >= models.length) {
-      return res.status(503).json({ error: lastError || 'All models unavailable' });
+      return send(503, { error: lastError || '所有 AI 模型暂时不可用，请稍后重试' });
     }
     const model = models[idx];
     console.log(`[edit-design] Trying ${model}: "${command}"`);
@@ -648,33 +655,41 @@ RULES:
       headers: { 'Content-Type': 'application/json', 'Content-Length': Buffer.byteLength(payload) },
       timeout: 60000
     };
+    let settled = false;
+    const settle = () => { if (settled) return false; settled = true; return true; };
     const r = https.request(options, (resp) => {
       let data = '';
       resp.on('data', c => data += c);
       resp.on('end', () => {
+        if (!settle()) return;
         try {
           const json = JSON.parse(data);
           if (json.error) {
+            const code = resp.statusCode;
             lastError = json.error.message || 'API error';
-            console.log(`[edit-design] ${model} error: ${lastError}`);
+            console.log(`[edit-design] ${model} error (${code}): ${lastError}`);
+            if (code === 401 || code === 403) return send(500, { error: 'Gemini API 密钥无效或权限不足' });
+            if (code === 429) { if (idx < models.length - 1) return tryModel(idx + 1); return send(429, { error: 'AI 调用次数超限，请稍后重试' }); }
             return tryModel(idx + 1);
           }
           const text = json.candidates?.[0]?.content?.parts?.[0]?.text;
           if (!text) {
             lastError = `${model}: empty response`;
-            return tryModel(idx + 1);
+            if (idx < models.length - 1) return tryModel(idx + 1);
+            return send(500, { error: 'AI 未能生成修改结果，请重试' });
           }
           const cleaned = text.replace(/^```markdown?\n?/i, '').replace(/\n?```\s*$/i, '').trim();
           console.log(`[edit-design] ${model} success, ${cleaned.length} chars`);
-          res.json({ content: cleaned, model });
+          send(200, { content: cleaned, model });
         } catch (e) {
           lastError = `Parse error: ${e.message}`;
-          tryModel(idx + 1);
+          if (idx < models.length - 1) return tryModel(idx + 1);
+          send(500, { error: 'AI 响应解析失败，请重试' });
         }
       });
     });
-    r.on('error', (err) => { lastError = err.message; tryModel(idx + 1); });
-    r.setTimeout(60000, () => { lastError = `${model} timeout`; r.destroy(); tryModel(idx + 1); });
+    r.on('error', (err) => { if (!settle()) return; lastError = err.message; if (idx < models.length - 1) return tryModel(idx + 1); send(500, { error: '无法连接 AI 服务，请检查网络' }); });
+    r.setTimeout(60000, () => { if (!settle()) return; lastError = `${model} timeout`; r.destroy(); if (idx < models.length - 1) return tryModel(idx + 1); send(504, { error: 'AI 编辑超时，请稍后重试' }); });
     r.write(payload);
     r.end();
   };
@@ -822,6 +837,8 @@ app.post('/api/extract', async (req, res) => {
       userMsg = '连接被重置，请稍后重试';
     } else if (msg.includes('ERR_INTERNET_DISCONNECTED') || msg.includes('ENETUNREACH')) {
       userMsg = '网络不可用，请检查网络连接';
+    } else if (msg.includes('Failed to launch') || msg.includes('Could not find') || msg.includes('spawn') || msg.includes('ENOENT')) {
+      userMsg = '浏览器引擎启动失败，请检查 Puppeteer 安装';
     } else {
       userMsg = '无法访问该网站: ' + msg;
     }
@@ -829,6 +846,23 @@ app.post('/api/extract', async (req, res) => {
   } finally {
     if (browser) try { await browser.close(); } catch {}
   }
+});
+
+// ─── Global Express error handler ──────────
+app.use((err, req, res, next) => {
+  if (err.type === 'entity.too.large') {
+    return res.status(413).json({ error: '请求体过大，请减小文件大小后重试' });
+  }
+  console.error('[express error]', err.message || err);
+  res.status(500).json({ error: '服务器内部错误，请稍后重试' });
+});
+
+// ─── Process crash handlers ──────────
+process.on('uncaughtException', (err) => {
+  console.error('[uncaughtException]', err);
+});
+process.on('unhandledRejection', (reason) => {
+  console.error('[unhandledRejection]', reason);
 });
 
 app.listen(PORT, () => {

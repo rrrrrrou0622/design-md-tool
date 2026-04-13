@@ -403,7 +403,7 @@
         <div class="canvas-chat-head" onclick="toggleChat()">
           <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="m12 3-1.9 5.8a2 2 0 0 1-1.3 1.3L3 12l5.8 1.9a2 2 0 0 1 1.3 1.3L12 21l1.9-5.8a2 2 0 0 1 1.3-1.3L21 12l-5.8-1.9a2 2 0 0 1-1.3-1.3L12 3Z"/></svg>
           <span class="canvas-chat-title">告诉 AI 你想改什么</span>
-          <div class="canvas-chat-kbd">⌘ Enter</div>
+          <div class="canvas-chat-kbd">Enter</div>
           <div class="canvas-chat-toggle"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="6 9 12 15 18 9"/></svg></div>
         </div>
         <input type="text" class="canvas-chat-input" id="chatInput" placeholder='"把主色改成深蓝"  "圆角改成12px"  "加一个阴影段落"'>
@@ -446,7 +446,7 @@
         <div>Gemini 正在生成页面...</div>
         <div style="font-size:11px;color:var(--muted)">通常需要 10-30 秒</div>
       </div>
-      <iframe class="preview-frame" id="previewFrame" style="display:none"></iframe>
+      <iframe class="preview-frame" id="previewFrame" style="display:none" sandbox="allow-scripts allow-same-origin"></iframe>
     </div>
   </div>
 
@@ -526,14 +526,19 @@ function showView(v){
 }
 
 async function loadTemplates(){
+  const ac=new AbortController();
+  const t=setTimeout(()=>ac.abort(),15000);
   try{
-    const r=await fetch('/api/templates');
+    const r=await fetch('/api/templates',{signal:ac.signal});
+    clearTimeout(t);
     if(!r.ok)throw new Error('服务器错误');
     allTemplates=await r.json();
     if(!allTemplates.length)throw new Error('模版列表为空');
     renderGallery();
   }catch(e){
-    document.getElementById('galGrid').innerHTML='<p style="color:var(--muted)">模版库加载失败：'+(e.message||'网络错误')+'。请刷新页面重试。</p>';
+    clearTimeout(t);
+    const msg=e.name==='AbortError'?'加载超时，请刷新页面重试':(e.message||'网络错误');
+    document.getElementById('galGrid').innerHTML='<p style="color:var(--muted)">模版库加载失败：'+msg+'。请刷新页面重试。</p>';
   }
 }
 
@@ -607,6 +612,7 @@ async function loadTemplate(id){
 }
 
 function parseDesignMd(md){
+  if(!md||typeof md!=='string')return[];
   const sections=[];let cur=null;let autoNum=0;
   const TITLE_MAP=[
     /visual theme|atmosphere|视觉主题|主题/i,
@@ -923,25 +929,25 @@ function setDevice(device){
 function downloadHtml(){
   if(!currentGeneratedHtml){showToast('没有可下载的内容');return}
   const a=document.createElement('a');
-  a.href=URL.createObjectURL(new Blob([currentGeneratedHtml],{type:'text/html'}));
-  a.download='page.html';
-  a.click();
+  const u=URL.createObjectURL(new Blob([currentGeneratedHtml],{type:'text/html'}));
+  a.href=u;a.download='page.html';a.click();
+  setTimeout(()=>URL.revokeObjectURL(u),1000);
   showToast('已下载');
 }
 
-function copyHtml(){
+async function copyHtml(){
   if(!currentGeneratedHtml){showToast('没有可复制的内容');return}
-  navigator.clipboard.writeText(currentGeneratedHtml);
-  showToast('HTML 已复制');
+  try{await navigator.clipboard.writeText(currentGeneratedHtml);showToast('HTML 已复制')}
+  catch{showToast('复制失败，请手动复制')}
 }
 
 function downloadMd(){
   const md=document.getElementById('rawMd').value;
   if(!md){showToast('没有 DESIGN.md');return}
   const a=document.createElement('a');
-  a.href=URL.createObjectURL(new Blob([md],{type:'text/markdown'}));
-  a.download='DESIGN.md';
-  a.click();
+  const u=URL.createObjectURL(new Blob([md],{type:'text/markdown'}));
+  a.href=u;a.download='DESIGN.md';a.click();
+  setTimeout(()=>URL.revokeObjectURL(u),1000);
   showToast('已下载 DESIGN.md');
   document.getElementById('genMenu').classList.remove('open');
 }
@@ -1381,11 +1387,16 @@ async function executeCommand(cmd){
   const chatInput=document.getElementById('chatInput');
   chatInput.disabled=true;chatInput.placeholder='AI 正在修改...';
   showToast('⏳ AI 处理中...');
+  const ac=new AbortController();
+  const timer=setTimeout(()=>ac.abort(),130000);
   try{
     const r=await fetch('/api/edit-design',{
       method:'POST',headers:{'Content-Type':'application/json'},
-      body:JSON.stringify({designMd:md,command:cmd})
+      body:JSON.stringify({designMd:md,command:cmd}),
+      signal:ac.signal
     });
+    clearTimeout(timer);
+    if(!r.ok){let msg='编辑失败';try{const j=await r.json();msg=j.error||msg}catch{}showToast('❌ '+msg);return}
     const data=await r.json();
     if(data.error){showToast('❌ '+data.error);return}
     document.getElementById('rawMd').value=data.content;
@@ -1393,7 +1404,9 @@ async function executeCommand(cmd){
     renderEditor();
     showToast('✅ 已应用: '+cmd);
   }catch(e){
-    showToast('❌ 网络错误');
+    clearTimeout(timer);
+    if(e.name==='AbortError'){showToast('❌ AI 编辑超时，请稍后重试')}
+    else{showToast('❌ 网络错误')}
   }finally{
     chatInput.disabled=false;chatInput.placeholder='"把主色改成深蓝"  "圆角改成12px"  "加一个阴影段落"';chatInput.focus();
   }
