@@ -3,6 +3,8 @@ const path = require('path');
 const fs = require('fs');
 const { execSync } = require('child_process');
 const https = require('https');
+const { extractRules, rulesToPromptConstraints } = require('./lib/rulesExtractor');
+const { scoreFidelity } = require('./lib/fidelityScorer');
 
 // Load .env if present
 const envPath = path.join(__dirname, '.env');
@@ -19,10 +21,22 @@ const PORT = process.env.PORT || 3100;
 app.use(express.json({ limit: '15mb' }));
 app.use(express.static(path.join(__dirname, 'public')));
 
+// ─── API request logging middleware ──────────
+app.use('/api', (req, res, next) => {
+  const start = Date.now();
+  const { method, path: reqPath } = req;
+  res.on('finish', () => {
+    const ms = Date.now() - start;
+    console.log(`[api] ${method} /api${reqPath} → ${res.statusCode} (${ms}ms)`);
+  });
+  next();
+});
+
 // ─── Gemini: generate full HTML page from DESIGN.md ──────────
 app.post('/api/generate-page', async (req, res) => {
   const { designMd, pageType, customPrompt } = req.body;
   if (!designMd) return res.status(400).json({ error: 'designMd required' });
+  if (typeof designMd !== 'string') return res.status(400).json({ error: 'designMd must be a string' });
 
   const apiKey = process.env.GEMINI_API_KEY;
   if (!apiKey) return res.status(500).json({ error: 'GEMINI_API_KEY not configured' });
@@ -82,6 +96,9 @@ app.post('/api/generate-page', async (req, res) => {
     }
   };
 
+  if (pageType && !PAGE_TEMPLATES[pageType]) {
+    return res.status(400).json({ error: `不支持的页面类型: ${pageType}，请使用有效的页面类型` });
+  }
   const template = PAGE_TEMPLATES[pageType] || PAGE_TEMPLATES.dashboard;
 
   // Trim DESIGN.md to key sections only (keep under 4000 chars)
@@ -169,8 +186,8 @@ RULES:
           const fenceStart = cleaned.search(/```html?\s*\n/i);
           if (fenceStart >= 0) cleaned = cleaned.substring(cleaned.indexOf('\n', fenceStart) + 1);
           cleaned = cleaned.replace(/\n?```\s*$/i, '').trim();
-          // Basic HTML validation: must contain at least one HTML-like tag
-          if (!/<\w+[\s>]/i.test(cleaned)) {
+          // Basic HTML validation: must contain structural HTML tags
+          if (!/<(html|body|div|section|main|header|footer|article|nav)[\s>]/i.test(cleaned)) {
             lastError = 'AI 生成的内容不是有效 HTML，请重试';
             console.log(`[generate-page] ${model}: invalid HTML (no tags found), ${cleaned.length} chars`);
             return tryModel(idx + 1);
@@ -205,10 +222,142 @@ RULES:
   tryModel(0);
 });
 
+// ─── Extract Rules Contract from DESIGN.md ──────────
+app.post('/api/extract-rules', (req, res) => {
+  const { designMd } = req.body;
+  if (!designMd) return res.status(400).json({ error: 'designMd required' });
+  try {
+    const result = extractRules(designMd);
+    res.json(result);
+  } catch (e) {
+    console.error('[extract-rules]', e.message);
+    res.status(500).json({ error: '规则提取失败: ' + e.message });
+  }
+});
+
+// ─── Score generated HTML against source DESIGN.md ──────────
+app.post('/api/score-fidelity', (req, res) => {
+  const { html, designMd } = req.body;
+  if (!html || !designMd) return res.status(400).json({ error: 'html and designMd required' });
+  try {
+    const score = scoreFidelity(html, designMd);
+    res.json({ score });
+  } catch (e) {
+    console.error('[score-fidelity]', e.message);
+    res.status(500).json({ error: '评分失败: ' + e.message });
+  }
+});
+
+// ─── Generate page with rules enforcement + fidelity scoring ──────────
+app.post('/api/generate-with-rules', async (req, res) => {
+  const { designMd, pageType, customPrompt } = req.body;
+  if (!designMd) return res.status(400).json({ error: 'designMd required' });
+
+  const apiKey = process.env.GEMINI_API_KEY;
+  if (!apiKey) return res.status(500).json({ error: 'GEMINI_API_KEY 未配置' });
+
+  let rulesData;
+  try {
+    rulesData = extractRules(designMd);
+  } catch (e) {
+    return res.status(400).json({ error: '规则提取失败: ' + e.message });
+  }
+
+  const PAGE_TEMPLATES = {
+    dashboard: 'A data-rich admin dashboard with nav, sidebar, 4 KPI cards, a chart, activity table',
+    landing: 'A marketing landing page with hero, features, testimonials, pricing, FAQ',
+    blog: 'A blog article page with header, long-form body, TOC sidebar, related posts',
+    profile: 'A user profile page with cover, avatar, tabs, post feed',
+    list: 'A mobile-style list page with search, list items (avatar + title + subtitle), clean hierarchy',
+    detail: 'A mobile-style detail page with back nav, hero amount/title, info cards, primary action button',
+    settings: 'A settings page with sidebar menu, forms, toggles, save button',
+    login: 'An auth page with centered card, login/signup tabs, social login divider'
+  };
+  const brief = PAGE_TEMPLATES[pageType] || PAGE_TEMPLATES.list;
+  const constraints = rulesToPromptConstraints(rulesData.rules, rulesData.context);
+  const trimmedMd = designMd.length > 3500 ? designMd.substring(0, 3500) + '\n(truncated)' : designMd;
+
+  const prompt = `Generate a complete HTML page that strictly follows the attached design system AND these hard constraints.
+
+${constraints}
+
+DESIGN SYSTEM REFERENCE:
+${trimmedMd}
+
+PAGE TO GENERATE: ${brief}
+${customPrompt ? `Additional context: ${customPrompt}` : ''}
+
+OUTPUT RULES:
+- Single HTML file, all CSS in <style>, start with <!DOCTYPE html>
+- Inline SVG for icons
+- Chinese placeholder content where natural (中文)
+- Responsive (media query at 768px)
+- NO explanation, NO code fences, ONLY the HTML starting with <!DOCTYPE html>`;
+
+  const payload = JSON.stringify({
+    contents: [{ parts: [{ text: prompt }] }],
+    generationConfig: { temperature: 0.4, maxOutputTokens: 16384 }
+  });
+
+  const models = ['gemini-2.5-flash', 'gemini-2.5-pro'];
+  let responded = false;
+  const send = (status, body) => { if (responded) return; responded = true; res.status(status).json(body); };
+
+  const tryModel = (idx) => {
+    if (responded) return;
+    if (idx >= models.length) return send(503, { error: '所有 AI 模型暂时不可用，请稍后重试' });
+    const model = models[idx];
+    console.log(`[gen-with-rules] Trying ${model} for ${pageType}`);
+    let settled = false;
+    const settle = () => { if (settled) return false; settled = true; return true; };
+    const r = https.request({
+      hostname: 'generativelanguage.googleapis.com',
+      path: `/v1beta/models/${model}:generateContent?key=${apiKey}`,
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'Content-Length': Buffer.byteLength(payload) },
+      timeout: 65000
+    }, (resp) => {
+      let data = '';
+      resp.on('data', c => data += c);
+      resp.on('end', () => {
+        if (!settle()) return;
+        try {
+          const json = JSON.parse(data);
+          if (json.error) {
+            console.log(`[gen-with-rules] ${model} error: ${json.error.message}`);
+            return tryModel(idx + 1);
+          }
+          const text = json.candidates?.[0]?.content?.parts?.[0]?.text;
+          if (!text) return tryModel(idx + 1);
+          let cleaned = text;
+          const fenceStart = cleaned.search(/```html?\s*\n/i);
+          if (fenceStart >= 0) cleaned = cleaned.substring(cleaned.indexOf('\n', fenceStart) + 1);
+          cleaned = cleaned.replace(/\n?```\s*$/i, '').trim();
+          if (!/<\w+[\s>]/i.test(cleaned)) return tryModel(idx + 1);
+
+          const score = scoreFidelity(cleaned, designMd, rulesData);
+          console.log(`[gen-with-rules] ${model} success, fidelity ${score.total}/100`);
+          send(200, { html: cleaned, model, pageType, rules: rulesData.rules, score });
+        } catch (e) {
+          console.log(`[gen-with-rules] parse error: ${e.message}`);
+          tryModel(idx + 1);
+        }
+      });
+    });
+    r.on('error', () => { if (settle()) tryModel(idx + 1); });
+    r.setTimeout(65000, () => { if (settle()) { r.destroy(); tryModel(idx + 1); } });
+    r.write(payload);
+    r.end();
+  };
+
+  tryModel(0);
+});
+
 // ─── Gemini Vision: analyze screenshot into DESIGN.md ──────────
 app.post('/api/analyze-image', async (req, res) => {
   const { imageBase64, userPrompt } = req.body;
   if (!imageBase64) return res.status(400).json({ error: '请上传一张图片' });
+  if (typeof imageBase64 !== 'string') return res.status(400).json({ error: '图片数据格式无效' });
 
   // Validate base64 size (~10MB image ≈ ~13.3MB base64)
   if (imageBase64.length > 14 * 1024 * 1024) {
@@ -376,6 +525,7 @@ Now analyze the screenshot and generate the DESIGN.md:`;
       return sendResponse(503, { error: '所有 AI 模型暂时不可用，请稍后重试' });
     }
     const model = models[modelIdx];
+    console.log(`[analyze-image] Trying ${model}...`);
     const options = {
       hostname: 'generativelanguage.googleapis.com',
       path: `/v1beta/models/${model}:generateContent?key=${apiKey}`,
@@ -386,16 +536,20 @@ Now analyze the screenshot and generate the DESIGN.md:`;
       }
     };
 
+    let settled = false;
+    const settle = () => { if (settled) return false; settled = true; return true; };
+
     const request = https.request(options, (response) => {
       let data = '';
       response.on('data', chunk => data += chunk);
       response.on('end', () => {
+        if (!settle()) return;
         try {
           const json = JSON.parse(data);
           if (json.error) {
             const code = response.statusCode;
             const msg = json.error.message || '';
-            console.log(`${model} error (${code}): ${msg}`);
+            console.log(`[analyze-image] ${model} error (${code}): ${msg}`);
             if (code === 401 || code === 403) {
               return sendResponse(500, { error: 'Gemini API 密钥无效或权限不足，请检查配置' });
             }
@@ -409,15 +563,16 @@ Now analyze the screenshot and generate the DESIGN.md:`;
           const text = json.candidates?.[0]?.content?.parts?.[0]?.text;
           if (!text) {
             const reason = json.candidates?.[0]?.finishReason || 'empty';
-            console.log(`${model}: empty response (${reason})`);
+            console.log(`[analyze-image] ${model}: empty response (${reason})`);
             if (modelIdx < models.length - 1) return tryModel(modelIdx + 1);
             return sendResponse(500, { error: 'AI 未能识别截图内容，请尝试更清晰的截图' });
           }
           const cleaned = text.replace(/^```markdown?\n?/i, '').replace(/\n?```\s*$/i, '').trim();
           const complete = ensureCompleteness(cleaned);
+          console.log(`[analyze-image] ${model} success, ${complete.length} chars`);
           sendResponse(200, { content: complete, model });
         } catch (e) {
-          console.error('Parse error:', e, data.substring(0, 500));
+          console.error(`[analyze-image] ${model} parse error:`, e.message, data.substring(0, 200));
           if (modelIdx < models.length - 1) return tryModel(modelIdx + 1);
           sendResponse(500, { error: 'AI 响应解析失败，请重试' });
         }
@@ -425,13 +580,15 @@ Now analyze the screenshot and generate the DESIGN.md:`;
     });
 
     request.on('error', (err) => {
-      console.error(`${model} request error:`, err);
+      if (!settle()) return;
+      console.error(`[analyze-image] ${model} network error:`, err.message);
       if (modelIdx < models.length - 1) return tryModel(modelIdx + 1);
       sendResponse(500, { error: '无法连接 AI 服务，请检查网络连接' });
     });
 
     request.setTimeout(120000, () => {
-      console.log(`${model} request timeout`);
+      if (!settle()) return;
+      console.log(`[analyze-image] ${model} timeout`);
       request.destroy();
       if (modelIdx < models.length - 1) return tryModel(modelIdx + 1);
       sendResponse(504, { error: 'AI 分析超时，请稍后重试' });
@@ -609,14 +766,22 @@ app.get('/api/templates/:id', async (req, res) => {
 app.post('/api/edit-design', async (req, res) => {
   const { designMd, command } = req.body;
   if (!designMd || !command) return res.status(400).json({ error: 'designMd and command required' });
+  if (typeof designMd !== 'string' || typeof command !== 'string') return res.status(400).json({ error: 'designMd and command must be strings' });
+  if (!command.trim()) return res.status(400).json({ error: '编辑指令不能为空' });
 
   const apiKey = process.env.GEMINI_API_KEY;
   if (!apiKey) return res.status(500).json({ error: 'GEMINI_API_KEY not configured' });
 
+  let trimmedDesignMd = designMd;
+  if (designMd.length > 8000) {
+    console.warn(`[edit-design] designMd truncated from ${designMd.length} to 8000 chars`);
+    trimmedDesignMd = designMd.substring(0, 8000) + '\n(truncated)';
+  }
+
   const prompt = `You are a design system editor. The user wants to modify this DESIGN.md file.
 
 CURRENT DESIGN.MD:
-${designMd.length > 6000 ? designMd.substring(0, 6000) + '\n(truncated)' : designMd}
+${trimmedDesignMd}
 
 USER COMMAND: ${command}
 
@@ -668,7 +833,7 @@ RULES:
             const code = resp.statusCode;
             lastError = json.error.message || 'API error';
             console.log(`[edit-design] ${model} error (${code}): ${lastError}`);
-            if (code === 401 || code === 403) return send(500, { error: 'Gemini API 密钥无效或权限不足' });
+            if (code === 401 || code === 403) return send(500, { error: 'Gemini API 密钥无效或权限不足，请检查配置' });
             if (code === 429) { if (idx < models.length - 1) return tryModel(idx + 1); return send(429, { error: 'AI 调用次数超限，请稍后重试' }); }
             return tryModel(idx + 1);
           }
@@ -701,6 +866,8 @@ RULES:
 app.post('/api/extract', async (req, res) => {
   const { url } = req.body;
   if (!url) return res.status(400).json({ error: 'URL is required' });
+  if (typeof url !== 'string') return res.status(400).json({ error: 'URL must be a string' });
+  if (url.length > 2048) return res.status(400).json({ error: 'URL 过长，请检查输入' });
 
   // Validate URL format
   try {
@@ -821,28 +988,36 @@ app.post('/api/extract', async (req, res) => {
     browser = null;
     res.json(designData);
   } catch (err) {
-    console.error('Extract error:', err.message);
-    // Classify Puppeteer errors into user-friendly messages
+    console.error('[extract] Error:', err.message);
+    // Classify Puppeteer errors into user-friendly messages with proper HTTP status codes
     const msg = err.message || '';
-    let userMsg;
+    let userMsg, statusCode;
     if (msg.includes('TimeoutError') || msg.includes('timeout') || msg.includes('Navigation timeout')) {
       userMsg = '页面加载超时，该网站响应过慢，请稍后重试';
+      statusCode = 504;
     } else if (msg.includes('ERR_NAME_NOT_RESOLVED') || msg.includes('getaddrinfo')) {
       userMsg = '域名无法解析，请检查网址是否正确';
+      statusCode = 502;
     } else if (msg.includes('ERR_SSL') || msg.includes('SSL') || msg.includes('certificate')) {
       userMsg = '该网站 SSL 证书有问题，无法安全连接';
+      statusCode = 502;
     } else if (msg.includes('ERR_CONNECTION_REFUSED')) {
       userMsg = '连接被拒绝，该网站可能已下线';
+      statusCode = 502;
     } else if (msg.includes('ERR_CONNECTION_RESET') || msg.includes('ECONNRESET')) {
       userMsg = '连接被重置，请稍后重试';
+      statusCode = 502;
     } else if (msg.includes('ERR_INTERNET_DISCONNECTED') || msg.includes('ENETUNREACH')) {
       userMsg = '网络不可用，请检查网络连接';
+      statusCode = 502;
     } else if (msg.includes('Failed to launch') || msg.includes('Could not find') || msg.includes('spawn') || msg.includes('ENOENT')) {
       userMsg = '浏览器引擎启动失败，请检查 Puppeteer 安装';
+      statusCode = 500;
     } else {
       userMsg = '无法访问该网站: ' + msg;
+      statusCode = 500;
     }
-    res.status(500).json({ error: userMsg });
+    res.status(statusCode).json({ error: userMsg });
   } finally {
     if (browser) try { await browser.close(); } catch {}
   }
@@ -851,10 +1026,15 @@ app.post('/api/extract', async (req, res) => {
 // ─── Global Express error handler ──────────
 app.use((err, req, res, next) => {
   if (err.type === 'entity.too.large') {
-    return res.status(413).json({ error: '请求体过大，请减小文件大小后重试' });
+    return res.status(413).json({ error: '请求体过大（超过 15MB），请减小文件大小后重试' });
+  }
+  if (err.type === 'entity.parse.failed') {
+    return res.status(400).json({ error: '请求体格式无效，请检查输入' });
   }
   console.error('[express error]', err.message || err);
-  res.status(500).json({ error: '服务器内部错误，请稍后重试' });
+  if (!res.headersSent) {
+    res.status(500).json({ error: '服务器内部错误，请稍后重试' });
+  }
 });
 
 // ─── Process crash handlers ──────────
