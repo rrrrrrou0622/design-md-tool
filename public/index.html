@@ -140,6 +140,9 @@
     .canvas-chat-kbd{display:flex;align-items:center;height:18px;padding:0 6px;background:var(--surface3);border:1px solid var(--border);border-radius:4px;font-size:9px;font-family:var(--mono);color:var(--muted)}
     .canvas-chat-input{width:100%;background:none;border:none;outline:none;font-size:12px;color:var(--text);font-family:var(--sans)}
     .canvas-chat-input::placeholder{color:var(--muted2)}
+    .canvas-chat.loading{border-color:var(--primary2);box-shadow:0 20px 40px -10px rgba(124,92,252,0.5),0 0 0 1px rgba(167,139,250,0.3)}
+    .canvas-chat.loading .canvas-chat-head svg{animation:pulse-glow 1.5s ease-in-out infinite}
+    @keyframes pulse-glow{0%,100%{opacity:1}50%{opacity:.4}}
 
     .swatch-header{display:flex;align-items:center;justify-content:space-between}
     .swatch-add{font-size:10px;font-weight:500;color:var(--muted);cursor:pointer}
@@ -223,7 +226,36 @@
       .preview-drawer{width:100vw}
       .preview-frame-wrap{padding:12px}
       .preview-frame-wrap.mobile{padding:24px}
+      .fidelity-panel{display:none}
     }
+
+    /* Fidelity Score sidebar */
+    .fidelity-panel{width:280px;flex-shrink:0;border-left:1px solid var(--border);background:var(--surface);overflow-y:auto;display:flex;flex-direction:column;gap:16px;padding:16px}
+    .fid-section{background:var(--surface2);border:1px solid var(--border2);border-radius:10px;padding:12px;display:flex;flex-direction:column;gap:10px}
+    .fid-label{font-size:10px;font-weight:600;color:var(--primary);letter-spacing:0.5px;text-transform:uppercase;font-family:var(--mono)}
+    .fid-score-row{display:flex;align-items:center;gap:12px}
+    .fid-big{display:flex;align-items:baseline;gap:2px;color:#22c55e}
+    .fid-big span{font-size:34px;font-weight:700;font-family:var(--sans);line-height:1}
+    .fid-big small{font-size:11px;color:var(--muted);font-weight:500}
+    .fid-big.warn{color:#f59e0b}
+    .fid-big.fail{color:#ef4444}
+    .fid-bars{flex:1;display:flex;flex-direction:column;gap:5px}
+    .fid-bar-row{display:flex;align-items:center;gap:6px;font-size:10px;color:var(--text3)}
+    .fid-bar-row>span:first-child{width:28px;flex-shrink:0}
+    .fid-bar-row>span:last-child{width:30px;text-align:right;color:var(--text2);font-family:var(--mono);font-size:9px}
+    .fid-track{flex:1;height:4px;border-radius:2px;background:var(--bg);overflow:hidden}
+    .fid-fill{height:100%;background:#22c55e;border-radius:2px;transition:width .4s}
+    .fid-rules{display:flex;flex-direction:column;gap:6px}
+    .fid-rule{display:flex;gap:8px;align-items:flex-start;font-size:11px;line-height:1.4;padding:6px 0}
+    .fid-rule-icon{width:14px;height:14px;flex-shrink:0;margin-top:1px;display:flex}
+    .fid-rule.ok .fid-rule-icon{color:#22c55e}
+    .fid-rule.warning .fid-rule-icon{color:#f59e0b}
+    .fid-rule.fail .fid-rule-icon{color:#ef4444}
+    .fid-rule.pending .fid-rule-icon{color:var(--muted2)}
+    .fid-rule-text{flex:1;color:var(--text2)}
+    .fid-rule.warning .fid-rule-text{color:#fcd34d}
+    .fid-rule.fail .fid-rule-text{color:#fca5a5}
+    .fid-rule-actual{font-size:10px;color:var(--muted);font-family:var(--mono)}
 
     @media (max-width:768px){
       .nav{padding:0 16px;height:52px;gap:10px}
@@ -270,7 +302,7 @@
       .canvas-chat.collapsed{width:100%;padding:10px 16px}
       .canvas-chat-title{display:none}
       .canvas-chat-kbd{display:none}
-      .canvas-chat-toggle{display:none}
+      .canvas-chat-toggle{display:flex}
     }
   </style>
 </head>
@@ -440,13 +472,32 @@
         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
       </button>
     </div>
-    <div class="preview-frame-wrap" id="previewFrameWrap">
-      <div class="preview-loading" id="previewLoading">
-        <div class="spinner"></div>
-        <div>Gemini 正在生成页面...</div>
-        <div style="font-size:11px;color:var(--muted)">通常需要 10-30 秒</div>
+    <div style="flex:1;display:flex;overflow:hidden">
+      <div class="preview-frame-wrap" id="previewFrameWrap" style="flex:1">
+        <div class="preview-loading" id="previewLoading">
+          <div class="spinner"></div>
+          <div>Gemini 正在生成页面...</div>
+          <div style="font-size:11px;color:var(--muted)">通常需要 10-30 秒</div>
+        </div>
+        <iframe class="preview-frame" id="previewFrame" style="display:none" sandbox="allow-scripts allow-same-origin"></iframe>
       </div>
-      <iframe class="preview-frame" id="previewFrame" style="display:none" sandbox="allow-scripts allow-same-origin"></iframe>
+      <aside class="fidelity-panel" id="fidelityPanel">
+        <div class="fid-section" id="fidScoreBox" style="display:none">
+          <div class="fid-label">Fidelity Score</div>
+          <div class="fid-score-row">
+            <div class="fid-big"><span id="fidTotal">—</span><small>/100</small></div>
+            <div class="fid-bars">
+              <div class="fid-bar-row"><span>配色</span><div class="fid-track"><div class="fid-fill" id="fidColorBar"></div></div><span id="fidColor">—</span></div>
+              <div class="fid-bar-row"><span>密度</span><div class="fid-track"><div class="fid-fill" id="fidDensityBar"></div></div><span id="fidDensity">—</span></div>
+              <div class="fid-bar-row"><span>层级</span><div class="fid-track"><div class="fid-fill" id="fidHierarchyBar"></div></div><span id="fidHierarchy">—</span></div>
+            </div>
+          </div>
+        </div>
+        <div class="fid-section" id="fidRulesBox">
+          <div class="fid-label">AI 将遵守的规则 <span id="fidRulesCount" style="color:var(--muted2);font-weight:400"></span></div>
+          <div id="fidRulesList" class="fid-rules"></div>
+        </div>
+      </aside>
     </div>
   </div>
 
@@ -526,6 +577,7 @@ function showView(v){
 }
 
 async function loadTemplates(){
+  if(!checkOnline())return;
   const ac=new AbortController();
   const t=setTimeout(()=>ac.abort(),15000);
   try{
@@ -537,8 +589,19 @@ async function loadTemplates(){
     renderGallery();
   }catch(e){
     clearTimeout(t);
-    const msg=e.name==='AbortError'?'加载超时，请刷新页面重试':(e.message||'网络错误');
-    document.getElementById('galGrid').innerHTML='<p style="color:var(--muted)">模版库加载失败：'+msg+'。请刷新页面重试。</p>';
+    const msg=e.name==='AbortError'?'加载超时':(e.message||'网络错误');
+    const grid=document.getElementById('galGrid');
+    grid.textContent='';
+    const errP=document.createElement('p');
+    errP.style.color='var(--muted)';
+    errP.textContent='模版库加载失败：'+msg;
+    const retryBtn=document.createElement('button');
+    retryBtn.className='nav-btn';
+    retryBtn.style.marginTop='12px';
+    retryBtn.textContent='重新加载';
+    retryBtn.onclick=()=>{grid.textContent='';loadTemplates()};
+    grid.appendChild(errP);
+    grid.appendChild(retryBtn);
   }
 }
 
@@ -580,6 +643,7 @@ function filterGallery(c){currentFilter=c;renderGallery()}
 
 async function loadTemplate(id){
   if(templateLoading){showToast('正在加载模版，请稍候...');return}
+  if(!checkOnline())return;
   templateLoading=true;
   showToast('正在加载模版，请稍候...');
   const controller=new AbortController();
@@ -606,8 +670,8 @@ async function loadTemplate(id){
     showToast((tpl?.name||id)+' 已加载');
   }catch(e){
     clearTimeout(timeout);
-    if(e.name==='AbortError'){showToast('模版加载超时，请稍后重试')}
-    else{showToast('错误: '+e.message)}
+    if(e.name==='AbortError'){showToast('模版加载超时，请稍后重试',4000)}
+    else{showToast('错误: '+e.message,4000)}
   }finally{templateLoading=false}
 }
 
@@ -837,16 +901,20 @@ document.addEventListener('click',e=>{
 });
 
 let currentGeneratedHtml='';
+let currentPageType='';
 const PAGE_NAMES={dashboard:'Dashboard 仪表盘',landing:'落地页',product:'商品详情页',settings:'设置页',pricing:'定价页',blog:'博客文章页',portfolio:'作品集',login:'登录注册页',profile:'个人主页',error:'404 错误页',changelog:'更新日志',docs:'文档页',appShowcase:'App 展示页'};
 
 let pageGenerating=false;
 async function generatePage(type){
   document.getElementById('genMenu').classList.remove('open');
   if(pageGenerating){showToast('正在生成中，请稍候');return}
+  if(!checkOnline())return;
   const md=document.getElementById('rawMd').value;
   if(!md){showToast('请先加载一个 DESIGN.md');return}
 
   pageGenerating=true;
+  currentGeneratedHtml='';
+  currentPageType=type;
 
   // Reset & open drawer with loading state
   const loadingEl=document.getElementById('previewLoading');
@@ -857,11 +925,16 @@ async function generatePage(type){
   document.getElementById('previewOverlay').classList.add('show');
   document.getElementById('previewDrawer').classList.add('open');
 
+  // Reset + fetch rules for sidebar preview
+  document.getElementById('fidScoreBox').style.display='none';
+  renderRules([],'pending');
+  fetchRules(md);
+
   const ac=new AbortController();
-  const timer=setTimeout(()=>ac.abort(),150000);
+  const timer=setTimeout(()=>ac.abort(),180000);
 
   try{
-    const r=await fetch('/api/generate-page',{
+    const r=await fetch('/api/generate-with-rules',{
       method:'POST',
       headers:{'Content-Type':'application/json'},
       body:JSON.stringify({designMd:md,pageType:type}),
@@ -873,8 +946,10 @@ async function generatePage(type){
       try{const err=await r.json();msg=err.error||msg}catch(_){}
       throw new Error(msg);
     }
-    const{html}=await r.json();
+    const data=await r.json();
+    const html=data.html;
     currentGeneratedHtml=html;
+    if(data.score)renderFidelityScore(data.score);
 
     // Render into iframe with fallback timeout
     const iframe=document.getElementById('previewFrame');
@@ -914,10 +989,82 @@ async function generatePage(type){
   }
 }
 
+// ─── Fidelity Score helpers ──────────
+async function fetchRules(md){
+  try{
+    const r=await fetch('/api/extract-rules',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({designMd:md})});
+    if(!r.ok)return;
+    const{rules}=await r.json();
+    renderRules(rules,'pending');
+  }catch(_){}
+}
+function renderRules(rules,defaultSeverity){
+  const list=document.getElementById('fidRulesList');
+  const count=document.getElementById('fidRulesCount');
+  count.textContent=rules.length?`· ${rules.length} 条`:'';
+  list.innerHTML='';
+  rules.forEach(r=>{
+    const severity=r.severity||defaultSeverity||'pending';
+    const div=document.createElement('div');
+    div.className='fid-rule '+severity;
+    const iconType=severity==='ok'?'check':severity==='warning'?'alert':severity==='fail'?'x':'clock';
+    const iconSvg={
+      check:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><polyline points="20 6 9 17 4 12"/></svg>',
+      alert:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>',
+      x:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>',
+      clock:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>'
+    }[iconType];
+    const ico=document.createElement('span');ico.className='fid-rule-icon';ico.innerHTML=iconSvg;
+    const txt=document.createElement('div');txt.className='fid-rule-text';txt.textContent=r.label;
+    div.appendChild(ico);div.appendChild(txt);
+    if(r.actual!==undefined&&r.actual!==null&&severity!=='pending'){
+      const act=document.createElement('div');act.className='fid-rule-actual';act.textContent=String(r.actual);
+      div.appendChild(act);
+    }
+    list.appendChild(div);
+  });
+}
+function renderFidelityScore(score){
+  document.getElementById('fidScoreBox').style.display='flex';
+  const total=score.total||0;
+  const totalEl=document.getElementById('fidTotal');
+  totalEl.textContent=total;
+  const bigEl=totalEl.parentElement;
+  bigEl.className='fid-big'+(total<60?' fail':total<80?' warn':'');
+  const setBar=(id,pct)=>{
+    const bar=document.getElementById(id+'Bar');
+    bar.style.width=Math.max(0,Math.min(100,pct))+'%';
+    bar.style.background=pct>=80?'#22c55e':pct>=60?'#f59e0b':'#ef4444';
+    document.getElementById(id).textContent=pct+'%';
+  };
+  setBar('fidColor',score.dimensions.color);
+  setBar('fidDensity',score.dimensions.density);
+  setBar('fidHierarchy',score.dimensions.hierarchy);
+  if(score.rulesResults)renderRules(score.rulesResults);
+}
+
 function closePreview(){
   document.getElementById('previewDrawer').classList.remove('open');
   document.getElementById('previewOverlay').classList.remove('show');
+  // Ensure editor view is still active after closing the overlay
+  const editorView=document.getElementById('editorView');
+  if(editorView&&!editorView.classList.contains('active')){
+    showView('editor');
+  }
 }
+document.addEventListener('keydown',e=>{
+  if(e.key==='Escape'&&document.getElementById('previewDrawer').classList.contains('open')){
+    closePreview();
+  }
+  // Cmd/Ctrl+Enter: focus chat input in editor view
+  if(e.key==='Enter'&&(e.metaKey||e.ctrlKey)&&document.getElementById('editorView').classList.contains('active')){
+    e.preventDefault();
+    const ci=document.getElementById('chatInput');
+    const chat=document.getElementById('canvasChat');
+    if(chat.classList.contains('collapsed'))toggleChat();
+    ci.focus();
+  }
+});
 
 function setDevice(device){
   const wrap=document.getElementById('previewFrameWrap');
@@ -928,17 +1075,30 @@ function setDevice(device){
 
 function downloadHtml(){
   if(!currentGeneratedHtml){showToast('没有可下载的内容');return}
+  const fname=(currentPageType||'page')+'.html';
   const a=document.createElement('a');
   const u=URL.createObjectURL(new Blob([currentGeneratedHtml],{type:'text/html'}));
-  a.href=u;a.download='page.html';a.click();
+  a.href=u;a.download=fname;a.style.display='none';
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
   setTimeout(()=>URL.revokeObjectURL(u),1000);
-  showToast('已下载');
+  showToast('已下载 '+fname);
 }
 
 async function copyHtml(){
   if(!currentGeneratedHtml){showToast('没有可复制的内容');return}
-  try{await navigator.clipboard.writeText(currentGeneratedHtml);showToast('HTML 已复制')}
-  catch{showToast('复制失败，请手动复制')}
+  try{
+    if(navigator.clipboard&&navigator.clipboard.writeText){
+      await navigator.clipboard.writeText(currentGeneratedHtml);
+    }else{
+      const ta=document.createElement('textarea');
+      ta.value=currentGeneratedHtml;ta.style.cssText='position:fixed;left:-9999px';
+      document.body.appendChild(ta);ta.select();document.execCommand('copy');
+      document.body.removeChild(ta);
+    }
+    showToast('HTML 已复制到剪贴板');
+  }catch(e){showToast('复制失败，请手动复制')}
 }
 
 function downloadMd(){
@@ -946,7 +1106,10 @@ function downloadMd(){
   if(!md){showToast('没有 DESIGN.md');return}
   const a=document.createElement('a');
   const u=URL.createObjectURL(new Blob([md],{type:'text/markdown'}));
-  a.href=u;a.download='DESIGN.md';a.click();
+  a.href=u;a.download='DESIGN.md';a.style.display='none';
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
   setTimeout(()=>URL.revokeObjectURL(u),1000);
   showToast('已下载 DESIGN.md');
   document.getElementById('genMenu').classList.remove('open');
@@ -965,6 +1128,7 @@ async function handleGenerate(){
 
   // 1. If image uploaded, send to Gemini Vision
   if(uploadedImage){
+    if(!checkOnline())return;
     const btn=document.getElementById('genBtn');
     btn.disabled=true;btn.classList.add('loading');
     showToast('Gemini 正在分析截图...');
@@ -984,11 +1148,13 @@ async function handleGenerate(){
         throw new Error(msg);
       }
       const{content}=await r.json();
+      const parsed=parseDesignMd(content);
+      if(!parsed||!parsed.length){showToast('截图分析结果格式异常，无法解析为设计系统',4000);return}
       document.getElementById('rawMd').value=content;
       document.getElementById('bcName').textContent='截图分析';
       const firstHex=content.match(/#[0-9a-fA-F]{6}/)?.[0]||'#7C5CFC';
       document.getElementById('bcDot').style.background=firstHex;
-      currentDesign=parseDesignMd(content);
+      currentDesign=parsed;
       renderEditor();
       showView('editor');
       clearImage();
@@ -996,8 +1162,8 @@ async function handleGenerate(){
       showToast('分析完成！');
     }catch(e){
       clearTimeout(timer);
-      if(e.name==='AbortError'){showToast('截图分析超时，请稍后重试')}
-      else{showToast('分析失败: '+e.message)}
+      if(e.name==='AbortError'){showToast('截图分析超时，请稍后重试',4000)}
+      else{showToast('分析失败: '+e.message,4000)}
     }finally{btn.disabled=false;btn.classList.remove('loading')}
     return;
   }
@@ -1014,6 +1180,7 @@ async function handleGenerate(){
 }
 
 async function extractFromUrl(url){
+  if(!checkOnline())return;
   const btn=document.getElementById('genBtn');
   btn.disabled=true;btn.classList.add('loading');
   showToast('正在提取设计语言，请稍候...');
@@ -1029,18 +1196,20 @@ async function extractFromUrl(url){
     }
     const data=await r.json();
     const md=generateStitchMd(data,url);
+    const parsed=parseDesignMd(md);
+    if(!parsed||!parsed.length){showToast('提取结果格式异常，无法解析为设计系统',4000);return}
     document.getElementById('rawMd').value=md;
     const host=new URL(url).hostname.replace('www.','');
     document.getElementById('bcName').textContent=host;
     document.getElementById('bcDot').style.background=data.colors[0]?.value||'#7C5CFC';
-    currentDesign=parseDesignMd(md);
+    currentDesign=parsed;
     renderEditor();
     showView('editor');
     showToast('提取成功！');
   }catch(e){
     clearTimeout(timer);
-    if(e.name==='AbortError'){showToast('请求超时，该网站响应过慢，请稍后重试')}
-    else{showToast('错误: '+e.message)}
+    if(e.name==='AbortError'){showToast('请求超时，该网站响应过慢，请稍后重试',4000)}
+    else{showToast('错误: '+e.message,4000)}
   }finally{btn.disabled=false;btn.classList.remove('loading')}
 }
 
@@ -1368,8 +1537,10 @@ document.getElementById('chatInput').addEventListener('keydown',e=>{
   if(e.key==='Enter'){const v=e.target.value.trim();e.target.value='';executeCommand(v)}
 });
 
+let chatEditing=false;
 async function executeCommand(cmd){
   if(!cmd)return;
+  if(chatEditing){showToast('AI 正在处理上一条指令，请稍候');return}
   let md=document.getElementById('rawMd').value;
   if(!md){showToast('请先加载一个设计系统');return}
 
@@ -1379,14 +1550,17 @@ async function executeCommand(cmd){
     const[,name,color]=colorChange;const hex=namedToHex(color);
     const re1=new RegExp(`(\\*\\*${name}\\*\\*\\s*\\()\`[^)]+\`(\\))`,'i');
     const re2=new RegExp(`(- ${name}:)\\s*\`?#[0-9a-fA-F]{3,8}\`?`,'i');
-    if(re1.test(md)){md=md.replace(re1,`$1\`${hex}\`$2`);document.getElementById('rawMd').value=md;currentDesign=parseDesignMd(md);renderEditor();showToast(`已更新 ${name} → ${hex}`);return}
-    if(re2.test(md)){md=md.replace(re2,`$1 \`${hex}\``);document.getElementById('rawMd').value=md;currentDesign=parseDesignMd(md);renderEditor();showToast(`已更新 ${name} → ${hex}`);return}
+    if(re1.test(md)){md=md.replace(re1,`$1\`${hex}\`$2`);const p=parseDesignMd(md);if(!p||!p.length){showToast('颜色替换后格式异常，操作已取消',4000);return}document.getElementById('rawMd').value=md;currentDesign=p;renderEditor();showToast(`已更新 ${name} → ${hex}`);return}
+    if(re2.test(md)){md=md.replace(re2,`$1 \`${hex}\``);const p=parseDesignMd(md);if(!p||!p.length){showToast('颜色替换后格式异常，操作已取消',4000);return}document.getElementById('rawMd').value=md;currentDesign=p;renderEditor();showToast(`已更新 ${name} → ${hex}`);return}
   }
 
   // AI path: send to Gemini for complex edits
+  if(!checkOnline())return;
+  chatEditing=true;
+  const chatEl=document.getElementById('canvasChat');
   const chatInput=document.getElementById('chatInput');
   chatInput.disabled=true;chatInput.placeholder='AI 正在修改...';
-  showToast('⏳ AI 处理中...');
+  chatEl.classList.add('loading');
   const ac=new AbortController();
   const timer=setTimeout(()=>ac.abort(),130000);
   try{
@@ -1396,18 +1570,23 @@ async function executeCommand(cmd){
       signal:ac.signal
     });
     clearTimeout(timer);
-    if(!r.ok){let msg='编辑失败';try{const j=await r.json();msg=j.error||msg}catch{}showToast('❌ '+msg);return}
-    const data=await r.json();
-    if(data.error){showToast('❌ '+data.error);return}
+    if(!r.ok){let msg='编辑失败';try{const j=await r.json();msg=j.error||msg}catch{}showToast(msg,4000);return}
+    let data;try{data=await r.json()}catch{showToast('AI 响应格式异常',4000);return}
+    if(data.error){showToast(data.error,4000);return}
+    if(!data.content||data.content.trim().length<20){showToast('AI 返回内容为空或过短，请重试',4000);return}
+    const parsed=parseDesignMd(data.content);
+    if(!parsed||!parsed.length){showToast('AI 返回内容格式异常，无法解析为设计系统',4000);return}
     document.getElementById('rawMd').value=data.content;
-    currentDesign=parseDesignMd(data.content);
+    currentDesign=parsed;
     renderEditor();
-    showToast('✅ 已应用: '+cmd);
+    showToast('已应用: '+cmd);
   }catch(e){
     clearTimeout(timer);
-    if(e.name==='AbortError'){showToast('❌ AI 编辑超时，请稍后重试')}
-    else{showToast('❌ 网络错误')}
+    if(e.name==='AbortError'){showToast('AI 编辑超时，请稍后重试',4000)}
+    else{showToast('网络错误，请检查连接',4000)}
   }finally{
+    chatEditing=false;
+    chatEl.classList.remove('loading');
     chatInput.disabled=false;chatInput.placeholder='"把主色改成深蓝"  "圆角改成12px"  "加一个阴影段落"';chatInput.focus();
   }
 }
@@ -1417,12 +1596,22 @@ function namedToHex(c){
   return{红:'#FF0000',蓝:'#0066FF',绿:'#00CC66',黑:'#000000',白:'#FFFFFF',橙:'#FF8800',紫:'#7C5CFC',粉:'#FF66AA',黄:'#FFCC00',青:'#00CCFF',灰:'#888888',深蓝:'#003366',浅蓝:'#66CCFF',red:'#FF0000',blue:'#0066FF',green:'#00CC66',black:'#000000',white:'#FFFFFF'}[c]||c;
 }
 
-function showToast(m){
+let _toastTimer=null;
+function showToast(m,duration){
   const t=document.getElementById('toast');
   t.textContent=m;
   t.classList.add('show');
-  setTimeout(()=>t.classList.remove('show'),2200);
+  if(_toastTimer)clearTimeout(_toastTimer);
+  _toastTimer=setTimeout(()=>{t.classList.remove('show');_toastTimer=null},duration||2200);
 }
+
+// Network offline detection
+function checkOnline(){
+  if(!navigator.onLine){showToast('网络已断开，请检查网络连接',4000);return false}
+  return true;
+}
+window.addEventListener('offline',()=>showToast('网络已断开，请检查网络连接',4000));
+window.addEventListener('online',()=>showToast('网络已恢复'));
 
 loadTemplates();
 
