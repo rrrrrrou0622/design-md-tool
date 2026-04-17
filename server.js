@@ -264,14 +264,25 @@ app.post('/api/generate-with-rules', async (req, res) => {
   }
 
   const PAGE_TEMPLATES = {
-    dashboard: 'A data-rich admin dashboard with nav, sidebar, 4 KPI cards, a chart, activity table',
-    landing: 'A marketing landing page with hero, features, testimonials, pricing, FAQ',
-    blog: 'A blog article page with header, long-form body, TOC sidebar, related posts',
-    profile: 'A user profile page with cover, avatar, tabs, post feed',
-    list: 'A mobile-style list page with search, list items (avatar + title + subtitle), clean hierarchy',
-    detail: 'A mobile-style detail page with back nav, hero amount/title, info cards, primary action button',
-    settings: 'A settings page with sidebar menu, forms, toggles, save button',
-    login: 'An auth page with centered card, login/signup tabs, social login divider'
+    // App 页面
+    list: 'A mobile-style list page with search bar, filter tabs, list items (avatar + title + subtitle + right-side meta), clean hierarchy. 390px wide mobile viewport.',
+    detail: 'A mobile-style detail page with back nav, hero image/amount, info card sections, primary action button at bottom. 390px wide.',
+    profile: 'A mobile user profile page with cover banner, circular avatar, name + bio, stats row (posts/followers/following), tab bar, content feed. 390px wide.',
+    settings: 'A mobile settings page with grouped menu sections (account, notifications, privacy, about), toggle switches, chevron arrows, logout button. 390px wide.',
+    login: 'A mobile auth page with logo, login/signup tab toggle, email + password inputs, social login buttons (WeChat/Apple/Google), forgot password link. 390px wide.',
+    onboarding: 'A mobile onboarding/welcome page with large illustration placeholder, headline, subtitle, dot indicators, "Next" button. 390px wide.',
+    search: 'A mobile search page with large search bar, recent searches, trending tags as pills, category grid. 390px wide.',
+    dashboard: 'A data-rich admin dashboard with nav, sidebar, 4 KPI cards, chart section, activity table.',
+    // PPT 幻灯片
+    pptCover: 'A 16:9 presentation cover slide (1280x720px). Large title centered, subtitle below, company logo top-left, minimal decorative element. Bold but clean.',
+    pptContent: 'A 16:9 presentation content slide (1280x720px). Title at top, 3-column layout with icon + heading + paragraph in each column. Consistent spacing.',
+    pptData: 'A 16:9 presentation data slide (1280x720px). Title at top, large bar chart or line chart using inline SVG, key metric callout number, source footnote.',
+    pptQuote: 'A 16:9 presentation quote slide (1280x720px). Large quotation marks, quote text centered in large font, attribution below. Dramatic whitespace.',
+    pptEnd: 'A 16:9 presentation closing slide (1280x720px). "Thank you" or "Q&A" centered, contact info, social links. Matches cover slide style.',
+    // 专题页
+    topicActivity: 'A long-scroll campaign/activity page: sticky nav, full-width hero banner with countdown timer, benefit cards grid, rules accordion, CTA button fixed at bottom. Chinese content.',
+    topicLaunch: 'A product launch page: hero with product image + tagline, feature showcase (alternating left-right sections), specs table, pre-order CTA, footer.',
+    topicLanding: 'A marketing landing page: sticky header, hero with headline + CTA, social proof bar (logos), 3-feature section, testimonials, pricing cards, FAQ, footer.'
   };
   const brief = PAGE_TEMPLATES[pageType] || PAGE_TEMPLATES.list;
   const constraints = rulesToPromptConstraints(rulesData.rules, rulesData.context);

@@ -188,6 +188,56 @@
     .agent-code{padding:12px;background:var(--bg);border-radius:6px;font-size:10px;font-family:var(--mono);color:var(--text3);line-height:1.7;display:flex;flex-direction:column;gap:2px;margin-top:8px}
 
     .empty-state{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:10px;color:var(--muted);padding:40px}
+
+    /* Config View */
+    #configView{align-items:center;overflow-y:auto}
+    .cfg-scroll{width:100%;max-width:520px;padding:24px 16px 40px 16px;display:flex;flex-direction:column;gap:0}
+    .cfg-hero{position:relative;width:100%;height:300px;border-radius:16px;overflow:hidden;background:var(--surface);border:1px solid var(--border)}
+    .cfg-hero-badge{position:absolute;top:12px;left:12px;display:flex;align-items:center;gap:6px;padding:5px 10px;background:rgba(0,0,0,0.75);backdrop-filter:blur(8px);border-radius:14px;font-size:11px;font-weight:500;color:#fff;z-index:2}
+    .cfg-badge-dot{width:6px;height:6px;border-radius:50%;background:#22c55e}
+    .cfg-hero iframe,.cfg-hero img{width:100%;height:100%;border:none;object-fit:cover}
+    .cfg-section{padding:16px 0}
+    .cfg-label{font-size:10px;font-weight:600;color:var(--primary);letter-spacing:0.6px;text-transform:uppercase;font-family:var(--mono);margin-bottom:10px}
+    .cfg-sublabel{font-size:11px;color:var(--muted);margin-bottom:8px}
+    .cfg-divider{height:1px;background:var(--border2)}
+    .cfg-swatches{display:flex;gap:6px;margin-bottom:8px}
+    .cfg-swatch{flex:1;height:36px;border-radius:6px;min-width:0}
+    .cfg-swatch.light{border:1px solid var(--border)}
+    .cfg-badges{display:flex;gap:6px;flex-wrap:wrap}
+    .cfg-badge{display:flex;align-items:center;gap:5px;padding:5px 10px;background:var(--surface);border:1px solid var(--border);border-radius:6px;font-size:11px;color:var(--text2)}
+    .cfg-badge svg{color:var(--muted);flex-shrink:0}
+    .cfg-output-cards{display:flex;flex-direction:column;gap:8px}
+    .cfg-card{display:flex;align-items:center;gap:14px;padding:14px;border-radius:12px;background:var(--surface);border:1px solid var(--border);cursor:pointer;transition:all .15s}
+    .cfg-card:hover{border-color:var(--muted3)}
+    .cfg-card.active{border-color:var(--primary);background:rgba(167,139,250,0.04)}
+    .cfg-card-icon{width:44px;height:44px;border-radius:10px;display:flex;align-items:center;justify-content:center;flex-shrink:0}
+    .cfg-card-body{flex:1;min-width:0}
+    .cfg-card-title{font-size:14px;font-weight:600;color:var(--text)}
+    .cfg-card-desc{font-size:11px;color:var(--muted);margin-top:2px}
+    .cfg-card-check{width:20px;height:20px;border-radius:10px;border:2px solid var(--border);flex-shrink:0;transition:all .15s}
+    .cfg-card.active .cfg-card-check{border-color:var(--primary);background:var(--primary);box-shadow:inset 0 0 0 3px var(--bg)}
+    .cfg-chips{display:flex;flex-wrap:wrap;gap:6px}
+    .cfg-chip{display:flex;align-items:center;gap:4px;padding:6px 12px;border-radius:16px;background:var(--surface);border:1px solid var(--border);font-size:11px;color:var(--text3);cursor:pointer;transition:all .15s;user-select:none}
+    .cfg-chip:hover{border-color:var(--muted3)}
+    .cfg-chip.active{background:rgba(167,139,250,0.1);border-color:var(--primary);color:var(--text)}
+    .cfg-chip.active::before{content:'✓ ';color:var(--primary)}
+    .cfg-toggle{display:flex;background:var(--surface);border-radius:10px;padding:3px;border:1px solid var(--border);margin-bottom:8px}
+    .cfg-tog{flex:1;display:flex;align-items:center;justify-content:center;gap:6px;padding:8px;border-radius:8px;font-size:12px;font-weight:500;color:var(--muted);background:transparent;transition:all .15s}
+    .cfg-tog.active{background:rgba(167,139,250,0.1);color:var(--text)}
+    .cfg-tog svg{flex-shrink:0}
+    .cfg-new-product{width:100%;padding:10px 14px;background:var(--surface);border:1px solid var(--border);border-radius:8px;font-size:13px;color:var(--text);outline:none;font-family:var(--sans)}
+    .cfg-new-product:focus{border-color:var(--primary)}
+    .cfg-rules-header{display:flex;align-items:center;gap:6px;margin-bottom:8px}
+    .cfg-rules-count{font-size:10px;color:var(--muted2);margin-left:auto}
+    .cfg-rules-list{display:flex;flex-direction:column;gap:4px}
+    .cfg-rule-item{display:flex;align-items:center;gap:8px;font-size:12px;color:var(--text2);padding:4px 0}
+    .cfg-rule-dot{width:4px;height:4px;border-radius:50%;background:#22c55e;flex-shrink:0}
+    .cfg-cta{padding:20px 0 0 0;display:flex;gap:8px}
+    .cfg-cta-btn{flex:1;height:44px;display:flex;align-items:center;justify-content:center;gap:6px;background:var(--primary2);color:#fff;border-radius:10px;font-size:14px;font-weight:600;transition:background .15s}
+    .cfg-cta-btn:hover{background:var(--primary-hover)}
+    .cfg-cta-btn:disabled{opacity:.5;cursor:not-allowed}
+    .cfg-cta-sec{height:44px;padding:0 16px;display:flex;align-items:center;justify-content:center;background:var(--surface);color:var(--text3);border:1px solid var(--border);border-radius:10px;font-size:13px;font-weight:500;transition:all .15s}
+    .cfg-cta-sec:hover{border-color:var(--muted3);color:var(--text2)}
     .empty-state svg{opacity:.2}
     .empty-state p{font-size:13px}
 
@@ -444,6 +494,70 @@
 
   </div>
 
+    <!-- Config View -->
+    <div class="view" id="configView">
+      <div class="cfg-scroll">
+        <!-- Hero: analyzed screenshot -->
+        <div class="cfg-hero" id="cfgHero">
+          <div class="cfg-hero-badge"><span class="cfg-badge-dot"></span><span id="cfgSource">已分析</span></div>
+        </div>
+        <!-- Design Language Summary -->
+        <div class="cfg-section">
+          <div class="cfg-label">提取的设计语言</div>
+          <div class="cfg-swatches" id="cfgSwatches"></div>
+          <div class="cfg-badges" id="cfgBadges"></div>
+        </div>
+        <div class="cfg-divider"></div>
+        <!-- Output Type Selector -->
+        <div class="cfg-section">
+          <div class="cfg-label">用这套语言生成</div>
+          <div class="cfg-output-cards">
+            <div class="cfg-card active" data-output="app" onclick="selectOutputType('app')">
+              <div class="cfg-card-icon" style="background:rgba(167,139,250,0.12)"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#a78bfa" stroke-width="2"><rect x="5" y="2" width="14" height="20" rx="2"/><line x1="12" y1="18" x2="12.01" y2="18"/></svg></div>
+              <div class="cfg-card-body"><div class="cfg-card-title">App 页面</div><div class="cfg-card-desc">列表 · 详情 · 个人中心 · 设置 ...</div></div>
+              <div class="cfg-card-check"></div>
+            </div>
+            <div class="cfg-card" data-output="ppt" onclick="selectOutputType('ppt')">
+              <div class="cfg-card-icon" style="background:rgba(92,170,252,0.12)"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#5CAAFC" stroke-width="2"><rect x="2" y="3" width="20" height="14" rx="2"/><path d="M8 21h8"/><path d="M12 17v4"/></svg></div>
+              <div class="cfg-card-body"><div class="cfg-card-title">PPT 幻灯片</div><div class="cfg-card-desc">封面 · 内容页 · 数据图表 ...</div></div>
+              <div class="cfg-card-check"></div>
+            </div>
+            <div class="cfg-card" data-output="topic" onclick="selectOutputType('topic')">
+              <div class="cfg-card-icon" style="background:rgba(232,99,74,0.12)"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#E8634A" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M3 9h18"/><path d="M9 21V9"/></svg></div>
+              <div class="cfg-card-body"><div class="cfg-card-title">专题页</div><div class="cfg-card-desc">活动 · 产品发布 · 落地页 ...</div></div>
+              <div class="cfg-card-check"></div>
+            </div>
+          </div>
+        </div>
+        <!-- Sub-type chips -->
+        <div class="cfg-section" id="cfgSubSection">
+          <div class="cfg-sublabel">选择页面类型（可多选）</div>
+          <div class="cfg-chips" id="cfgChips"></div>
+        </div>
+        <div class="cfg-divider"></div>
+        <!-- Content source -->
+        <div class="cfg-section">
+          <div class="cfg-sublabel">内容来源</div>
+          <div class="cfg-toggle">
+            <button class="cfg-tog active" id="togSame" onclick="setContentSource('same')"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg> <span id="togSameLabel">沿用原产品</span></button>
+            <button class="cfg-tog" id="togNew" onclick="setContentSource('new')"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 12a9 9 0 1 1-6.219-8.56"/></svg> 换一个产品</button>
+          </div>
+          <input type="text" class="cfg-new-product" id="cfgNewProduct" placeholder="输入新产品名称，如：健身 App" style="display:none">
+        </div>
+        <div class="cfg-divider"></div>
+        <!-- Rules contract -->
+        <div class="cfg-section">
+          <div class="cfg-rules-header"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#22c55e" stroke-width="2"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg> <span style="color:#22c55e;font-weight:600;font-size:11px">AI 将遵守的设计规则</span><span class="cfg-rules-count" id="cfgRulesCount"></span></div>
+          <div class="cfg-rules-list" id="cfgRulesList"></div>
+        </div>
+        <!-- CTA -->
+        <div class="cfg-cta">
+          <button class="cfg-cta-btn" id="cfgGenBtn" onclick="generateFromConfig()"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="m12 3-1.9 5.8a2 2 0 0 1-1.3 1.3L3 12l5.8 1.9a2 2 0 0 1 1.3 1.3L12 21l1.9-5.8a2 2 0 0 1 1.3-1.3L21 12l-5.8-1.9a2 2 0 0 1-1.3-1.3L12 3Z"/></svg> <span id="cfgGenLabel">生成 App 页面</span></button>
+          <button class="cfg-cta-sec" onclick="showView('editor')">编辑 DESIGN.md</button>
+        </div>
+      </div>
+    </div>
+
   <!-- Preview Drawer -->
   <div class="preview-overlay" id="previewOverlay" onclick="closePreview()"></div>
   <div class="preview-drawer" id="previewDrawer">
@@ -576,6 +690,115 @@ function showView(v){
   document.querySelectorAll('.nav-link').forEach(el=>el.classList.toggle('active',el.dataset.view===v));
 }
 
+// ─── Config View ──────────
+let cfgOutputType='app',cfgSelectedChips=new Set(),cfgContentSource='same',cfgRulesData=null;
+const CFG_CHIPS={
+  app:[{id:'list',label:'列表页'},{id:'detail',label:'详情页'},{id:'profile',label:'个人中心'},{id:'settings',label:'设置'},{id:'login',label:'登录'},{id:'onboarding',label:'引导页'},{id:'search',label:'搜索'},{id:'dashboard',label:'仪表盘'}],
+  ppt:[{id:'pptCover',label:'封面'},{id:'pptContent',label:'内容页'},{id:'pptData',label:'数据图表'},{id:'pptQuote',label:'金句页'},{id:'pptEnd',label:'结束页'}],
+  topic:[{id:'topicActivity',label:'活动页'},{id:'topicLaunch',label:'发布页'},{id:'topicLanding',label:'落地页'}]
+};
+
+async function enterConfigView(sourceName,designMd){
+  document.getElementById('cfgSource').textContent='已分析 · '+sourceName;
+  // Populate swatches
+  const hexes=(designMd.match(/#[0-9a-fA-F]{6}/g)||[]).map(h=>h.toUpperCase());
+  const unique=[...new Set(hexes)].slice(0,5);
+  const swatchEl=document.getElementById('cfgSwatches');
+  swatchEl.innerHTML='';
+  unique.forEach(c=>{
+    const d=document.createElement('div');
+    d.className='cfg-swatch'+(isLightColor(c)?' light':'');
+    d.style.background=c;
+    swatchEl.appendChild(d);
+  });
+  // Populate badges
+  const fontMatch=designMd.match(/\*\*Primary\*\*:\s*([^\n]+)/i);
+  const font=fontMatch?fontMatch[1].replace(/`/g,'').trim().split(',')[0].trim():'Inter';
+  const radiusMatch=designMd.match(/(\d+)px/);
+  const radius=radiusMatch?radiusMatch[1]:'8';
+  const badgesEl=document.getElementById('cfgBadges');
+  badgesEl.innerHTML=`<div class="cfg-badge"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 7V4h16v3"/><path d="M9 20h6"/><path d="M12 4v16"/></svg>${font}</div><div class="cfg-badge"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2"/></svg>圆角 ${radius}px</div>`;
+  // Fetch rules
+  try{
+    const r=await fetch('/api/extract-rules',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({designMd})});
+    if(r.ok){
+      cfgRulesData=await r.json();
+      renderConfigRules(cfgRulesData.rules);
+    }
+  }catch(_){}
+  // Set defaults
+  selectOutputType('app');
+  showView('config');
+}
+
+function isLightColor(hex){
+  const r=parseInt(hex.slice(1,3),16),g=parseInt(hex.slice(3,5),16),b=parseInt(hex.slice(5,7),16);
+  return(r*299+g*587+b*114)/1000>180;
+}
+
+function selectOutputType(type){
+  cfgOutputType=type;
+  document.querySelectorAll('.cfg-card').forEach(c=>c.classList.toggle('active',c.dataset.output===type));
+  const chips=CFG_CHIPS[type]||[];
+  cfgSelectedChips=new Set(chips.slice(0,2).map(c=>c.id));
+  renderChips(chips);
+  updateGenLabel();
+}
+
+function renderChips(chips){
+  const el=document.getElementById('cfgChips');
+  el.innerHTML='';
+  chips.forEach(c=>{
+    const d=document.createElement('div');
+    d.className='cfg-chip'+(cfgSelectedChips.has(c.id)?' active':'');
+    d.textContent=c.label;
+    d.onclick=()=>{
+      if(cfgSelectedChips.has(c.id)){cfgSelectedChips.delete(c.id);d.classList.remove('active')}
+      else{cfgSelectedChips.add(c.id);d.classList.add('active')}
+      updateGenLabel();
+    };
+    el.appendChild(d);
+  });
+}
+
+function setContentSource(src){
+  cfgContentSource=src;
+  document.getElementById('togSame').classList.toggle('active',src==='same');
+  document.getElementById('togNew').classList.toggle('active',src==='new');
+  document.getElementById('cfgNewProduct').style.display=src==='new'?'block':'none';
+  if(src==='new')document.getElementById('cfgNewProduct').focus();
+}
+
+function updateGenLabel(){
+  const n=cfgSelectedChips.size;
+  const typeNames={app:'App 页面',ppt:'PPT 幻灯片',topic:'专题页'};
+  document.getElementById('cfgGenLabel').textContent=n?`生成 ${n} 个${typeNames[cfgOutputType]}`:`选择页面类型`;
+  document.getElementById('cfgGenBtn').disabled=!n;
+}
+
+function renderConfigRules(rules){
+  const list=document.getElementById('cfgRulesList');
+  const count=document.getElementById('cfgRulesCount');
+  count.textContent=rules.length?`· ${rules.length} 条`:'';
+  list.innerHTML='';
+  rules.forEach(r=>{
+    const d=document.createElement('div');
+    d.className='cfg-rule-item';
+    d.innerHTML=`<span class="cfg-rule-dot"></span>${r.label}`;
+    list.appendChild(d);
+  });
+}
+
+async function generateFromConfig(){
+  if(!cfgSelectedChips.size){showToast('请先选择页面类型');return}
+  const md=document.getElementById('rawMd').value;
+  if(!md){showToast('请先加载设计系统');return}
+  const customPrompt=cfgContentSource==='new'?document.getElementById('cfgNewProduct').value:'';
+  // Generate each selected type sequentially, open preview for the first one
+  const types=[...cfgSelectedChips];
+  generatePage(types[0]);
+}
+
 async function loadTemplates(){
   if(!checkOnline())return;
   const ac=new AbortController();
@@ -666,7 +889,7 @@ async function loadTemplate(id){
     currentDesign=parseDesignMd(content);
     if(!currentDesign||!currentDesign.length){throw new Error('模版内容格式异常，无法解析')}
     renderEditor();
-    showView('editor');
+    enterConfigView(tpl?.name||id,content);
     showToast((tpl?.name||id)+' 已加载');
   }catch(e){
     clearTimeout(timeout);
@@ -1156,7 +1379,7 @@ async function handleGenerate(){
       document.getElementById('bcDot').style.background=firstHex;
       currentDesign=parsed;
       renderEditor();
-      showView('editor');
+      enterConfigView('截图分析',content);
       clearImage();
       document.getElementById('promptInput').value='';
       showToast('分析完成！');
@@ -1204,7 +1427,7 @@ async function extractFromUrl(url){
     document.getElementById('bcDot').style.background=data.colors[0]?.value||'#7C5CFC';
     currentDesign=parsed;
     renderEditor();
-    showView('editor');
+    enterConfigView(host,md);
     showToast('提取成功！');
   }catch(e){
     clearTimeout(timer);
