@@ -831,10 +831,10 @@ async function generateFromConfig(){
   if(!cfgSelectedChips.size){showToast('请先选择页面类型');return}
   const md=document.getElementById('rawMd').value;
   if(!md){showToast('请先加载设计系统');return}
-  const customPrompt=cfgContentSource==='new'?document.getElementById('cfgNewProduct').value:'';
-  // Generate each selected type sequentially, open preview for the first one
+  const customPrompt=cfgContentSource==='new'?document.getElementById('cfgNewProduct').value.trim():'';
+  if(cfgContentSource==='new'&&!customPrompt){showToast('请输入新产品名称');return}
   const types=[...cfgSelectedChips];
-  generatePage(types[0]);
+  generatePage(types[0],customPrompt);
 }
 
 async function loadTemplates(){
@@ -1166,7 +1166,7 @@ let currentPageType='';
 const PAGE_NAMES={dashboard:'Dashboard 仪表盘',landing:'落地页',product:'商品详情页',settings:'设置页',pricing:'定价页',blog:'博客文章页',portfolio:'作品集',login:'登录注册页',profile:'个人主页',error:'404 错误页',changelog:'更新日志',docs:'文档页',appShowcase:'App 展示页'};
 
 let pageGenerating=false;
-async function generatePage(type){
+async function generatePage(type,customPrompt){
   document.getElementById('genMenu').classList.remove('open');
   if(pageGenerating){showToast('正在生成中，请稍候');return}
   if(!checkOnline())return;
@@ -1198,7 +1198,7 @@ async function generatePage(type){
     const r=await fetch('/api/generate-with-rules',{
       method:'POST',
       headers:{'Content-Type':'application/json'},
-      body:JSON.stringify({designMd:md,pageType:type}),
+      body:JSON.stringify({designMd:md,pageType:type,customPrompt:customPrompt||'',sourceImage:uploadedImage||''}),
       signal:ac.signal
     });
     clearTimeout(timer);
@@ -1241,7 +1241,7 @@ async function generatePage(type){
     retryBtn.className='nav-btn';
     retryBtn.style.marginTop='12px';
     retryBtn.textContent='重试';
-    retryBtn.onclick=()=>generatePage(type);
+    retryBtn.onclick=()=>generatePage(type,customPrompt);
     loadingEl.appendChild(errTitle);
     loadingEl.appendChild(errDetail);
     loadingEl.appendChild(retryBtn);

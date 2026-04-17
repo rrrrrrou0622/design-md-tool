@@ -250,8 +250,17 @@ app.post('/api/score-fidelity', (req, res) => {
 
 // ─── Generate page with rules enforcement + fidelity scoring ──────────
 app.post('/api/generate-with-rules', async (req, res) => {
-  const { designMd, pageType, customPrompt } = req.body;
+  const { designMd, pageType, customPrompt, sourceImage } = req.body;
   if (!designMd) return res.status(400).json({ error: 'designMd required' });
+
+  let imagePart = null;
+  if (typeof sourceImage === 'string' && sourceImage.startsWith('data:image/')) {
+    if (sourceImage.length > 14 * 1024 * 1024) {
+      return res.status(413).json({ error: '源图过大（>14MB）' });
+    }
+    const m = sourceImage.match(/^data:(image\/\w+);base64,(.+)$/);
+    if (m) imagePart = { inline_data: { mime_type: m[1], data: m[2] } };
+  }
 
   const apiKey = process.env.GEMINI_API_KEY;
   if (!apiKey) return res.status(500).json({ error: 'GEMINI_API_KEY 未配置' });
@@ -288,15 +297,24 @@ app.post('/api/generate-with-rules', async (req, res) => {
   const constraints = rulesToPromptConstraints(rulesData.rules, rulesData.context);
   const trimmedMd = designMd.length > 3500 ? designMd.substring(0, 3500) + '\n(truncated)' : designMd;
 
-  const prompt = `Generate a complete HTML page that strictly follows the attached design system AND these hard constraints.
+  const prompt = `Generate a complete HTML page that matches the VISUAL PERSONALITY of the attached reference image${imagePart ? '' : ' (no image provided — use DESIGN.md only)'} and follows these hard constraints.
 
-${constraints}
+${imagePart ? `VISUAL REFERENCE (image attached):
+Match the attached screenshot's visual personality: accent colors, card variety, use of imagery/illustrations/badges, information density, decorative elements, overall "feel". The DESIGN.md is a coarse text summary; when it conflicts with the image, TRUST THE IMAGE. Do NOT produce a minimal black-and-white list just because the dominant colors are dark — if the reference has yellow badges, pink pills, green tags, COLORFUL CARDS, MAPS, ILLUSTRATIONS, your output must have similar richness.
 
-DESIGN SYSTEM REFERENCE:
+` : ''}${constraints}
+
+DESIGN SYSTEM REFERENCE (text summary):
 ${trimmedMd}
 
 PAGE TO GENERATE: ${brief}
 ${customPrompt ? `Additional context: ${customPrompt}` : ''}
+
+QUALITY BAR (avoid "generic AI output"):
+- DO NOT produce an empty monotonous list — vary card types, sizes, content
+- Use accent colors as badges/pills/highlights (not just background)
+- Include inline SVG for icons AND at least 2 decorative visual elements (gradient, illustration, chart, map placeholder)
+- Information density should roughly match the reference image
 
 OUTPUT RULES:
 - Single HTML file, all CSS in <style>, start with <!DOCTYPE html>
@@ -305,63 +323,96 @@ OUTPUT RULES:
 - Responsive (media query at 768px)
 - NO explanation, NO code fences, ONLY the HTML starting with <!DOCTYPE html>`;
 
-  const payload = JSON.stringify({
-    contents: [{ parts: [{ text: prompt }] }],
-    generationConfig: { temperature: 0.4, maxOutputTokens: 16384 }
+  const callGemini = (promptText, modelOrder) => new Promise((resolve, reject) => {
+    const parts = [{ text: promptText }];
+    if (imagePart) parts.push(imagePart);
+    const payload = JSON.stringify({
+      contents: [{ parts }],
+      generationConfig: { temperature: 0.4, maxOutputTokens: 16384 }
+    });
+    const tryModel = (idx) => {
+      if (idx >= modelOrder.length) return reject(new Error('all models exhausted'));
+      const model = modelOrder[idx];
+      console.log(`[gen-with-rules] Trying ${model} for ${pageType}`);
+      let settled = false;
+      const settle = () => { if (settled) return false; settled = true; return true; };
+      const r = https.request({
+        hostname: 'generativelanguage.googleapis.com',
+        path: `/v1beta/models/${model}:generateContent?key=${apiKey}`,
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'Content-Length': Buffer.byteLength(payload) },
+        timeout: 65000
+      }, (resp) => {
+        let data = '';
+        resp.on('data', c => data += c);
+        resp.on('end', () => {
+          if (!settle()) return;
+          try {
+            const json = JSON.parse(data);
+            if (json.error) {
+              console.log(`[gen-with-rules] ${model} error: ${json.error.message}`);
+              return tryModel(idx + 1);
+            }
+            const text = json.candidates?.[0]?.content?.parts?.[0]?.text;
+            if (!text) return tryModel(idx + 1);
+            let cleaned = text;
+            const fenceStart = cleaned.search(/```html?\s*\n/i);
+            if (fenceStart >= 0) cleaned = cleaned.substring(cleaned.indexOf('\n', fenceStart) + 1);
+            cleaned = cleaned.replace(/\n?```\s*$/i, '').trim();
+            if (!/<\w+[\s>]/i.test(cleaned)) return tryModel(idx + 1);
+            resolve({ html: cleaned, model });
+          } catch (e) {
+            console.log(`[gen-with-rules] parse error: ${e.message}`);
+            tryModel(idx + 1);
+          }
+        });
+      });
+      r.on('error', () => { if (settle()) tryModel(idx + 1); });
+      r.setTimeout(65000, () => { if (settle()) { r.destroy(); tryModel(idx + 1); } });
+      r.write(payload);
+      r.end();
+    };
+    tryModel(0);
   });
 
-  const models = ['gemini-2.5-flash', 'gemini-2.5-pro'];
-  let responded = false;
-  const send = (status, body) => { if (responded) return; responded = true; res.status(status).json(body); };
+  const FIDELITY_THRESHOLD = parseInt(process.env.FIDELITY_THRESHOLD || '70', 10);
+  try {
+    const first = await callGemini(prompt, ['gemini-2.5-flash', 'gemini-2.5-pro']);
+    let bestHtml = first.html;
+    let bestModel = first.model;
+    let bestScore = scoreFidelity(bestHtml, designMd, rulesData);
+    console.log(`[gen-with-rules] ${first.model} attempt1 fidelity ${bestScore.total}/100`);
 
-  const tryModel = (idx) => {
-    if (responded) return;
-    if (idx >= models.length) return send(503, { error: '所有 AI 模型暂时不可用，请稍后重试' });
-    const model = models[idx];
-    console.log(`[gen-with-rules] Trying ${model} for ${pageType}`);
-    let settled = false;
-    const settle = () => { if (settled) return false; settled = true; return true; };
-    const r = https.request({
-      hostname: 'generativelanguage.googleapis.com',
-      path: `/v1beta/models/${model}:generateContent?key=${apiKey}`,
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json', 'Content-Length': Buffer.byteLength(payload) },
-      timeout: 65000
-    }, (resp) => {
-      let data = '';
-      resp.on('data', c => data += c);
-      resp.on('end', () => {
-        if (!settle()) return;
-        try {
-          const json = JSON.parse(data);
-          if (json.error) {
-            console.log(`[gen-with-rules] ${model} error: ${json.error.message}`);
-            return tryModel(idx + 1);
-          }
-          const text = json.candidates?.[0]?.content?.parts?.[0]?.text;
-          if (!text) return tryModel(idx + 1);
-          let cleaned = text;
-          const fenceStart = cleaned.search(/```html?\s*\n/i);
-          if (fenceStart >= 0) cleaned = cleaned.substring(cleaned.indexOf('\n', fenceStart) + 1);
-          cleaned = cleaned.replace(/\n?```\s*$/i, '').trim();
-          if (!/<\w+[\s>]/i.test(cleaned)) return tryModel(idx + 1);
+    if (bestScore.total < FIDELITY_THRESHOLD) {
+      const failed = bestScore.rulesResults.filter(r => !r.passed);
+      const failDesc = failed.slice(0, 6).map(r => {
+        const actual = r.actual == null ? '' : ` (got: ${JSON.stringify(r.actual)})`;
+        return `- ${r.label}${actual}`;
+      }).join('\n');
+      const retryPrompt = `${prompt}
 
-          const score = scoreFidelity(cleaned, designMd, rulesData);
-          console.log(`[gen-with-rules] ${model} success, fidelity ${score.total}/100`);
-          send(200, { html: cleaned, model, pageType, rules: rulesData.rules, score });
-        } catch (e) {
-          console.log(`[gen-with-rules] parse error: ${e.message}`);
-          tryModel(idx + 1);
+PREVIOUS ATTEMPT SCORED ${bestScore.total}/100 — BELOW ACCEPTABLE THRESHOLD.
+Failed constraints:
+${failDesc || '(see constraints above)'}
+Produce a NEW version that passes these constraints. Use only the colors and font sizes listed. Keep whitespace generous. Respect the hierarchy described.`;
+      try {
+        const retry = await callGemini(retryPrompt, ['gemini-2.5-pro']);
+        const retryScore = scoreFidelity(retry.html, designMd, rulesData);
+        console.log(`[gen-with-rules] retry ${retry.model} fidelity ${retryScore.total}/100 (was ${bestScore.total})`);
+        if (retryScore.total > bestScore.total) {
+          bestHtml = retry.html;
+          bestModel = retry.model;
+          bestScore = retryScore;
         }
-      });
-    });
-    r.on('error', () => { if (settle()) tryModel(idx + 1); });
-    r.setTimeout(65000, () => { if (settle()) { r.destroy(); tryModel(idx + 1); } });
-    r.write(payload);
-    r.end();
-  };
+      } catch (e) {
+        console.log(`[gen-with-rules] retry failed: ${e.message}, keeping original`);
+      }
+    }
 
-  tryModel(0);
+    res.status(200).json({ html: bestHtml, model: bestModel, pageType, rules: rulesData.rules, score: bestScore });
+  } catch (e) {
+    res.status(503).json({ error: '所有 AI 模型暂时不可用，请稍后重试' });
+  }
 });
 
 // ─── Gemini Vision: analyze screenshot into DESIGN.md ──────────
